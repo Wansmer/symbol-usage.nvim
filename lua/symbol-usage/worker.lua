@@ -56,8 +56,10 @@ function W:collect_symbols()
       return
     end
 
-    if ctx.version ~= vim.lsp.util.buf_versions[self.bufnr] then
-      return
+    if vim.fn.has('nvim-0.10') ~= 0 then
+      if ctx.version ~= vim.lsp.util.buf_versions[self.bufnr] then
+        return
+      end
     end
 
     local actual = self:traversal(response)
@@ -86,7 +88,8 @@ function W:is_need_count(kind, method)
 
   local kinds = self.opts[method].kinds or self.opts.kinds
   ---@diagnostic disable-next-line: param-type-mismatch
-  return vim.list_contains(kinds, kind)
+  return vim.tbl_contains(kinds, kind)
+  -- return vim.list_contains(kinds, kind)
 end
 
 ---Traverse and collect document symbols
@@ -168,9 +171,15 @@ function W:count_method(method, symbol_id, symbol)
 
   local params = self:make_params(symbol, method)
   local function handler(err, response, ctx)
-    -- If document was changed, break collecting
-    if err or ctx.version ~= vim.lsp.util.buf_versions[self.bufnr] then
+    if err then
       return
+    end
+
+    -- If document was changed, break collecting
+    if vim.fn.has('nvim-0.10') ~= 0 then
+      if ctx.version ~= vim.lsp.util.buf_versions[self.bufnr] then
+        return
+      end
     end
 
     -- Some clients return `nil` if there are no references (e.g. `lua_ls`)

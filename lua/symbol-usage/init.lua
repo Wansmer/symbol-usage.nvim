@@ -9,7 +9,7 @@ local nested = vim.api.nvim_create_augroup('__symbol_nested__', { clear = true }
 local M = {}
 
 function M.attach()
-  vim.api.nvim_create_autocmd({ 'LspAttach', 'LspDetach' }, {
+  vim.api.nvim_create_autocmd({ 'LspAttach' }, {
     group = group,
     callback = function(event)
       local client = vim.lsp.get_client_by_id(event.data.client_id)
@@ -22,19 +22,32 @@ function M.attach()
       w:run(false)
       state.add_worker(event.buf, w)
 
-      vim.api.nvim_create_autocmd({ 'TextChanged', 'InsertLeave', 'LspNotify' }, {
+      vim.api.nvim_create_autocmd({ 'TextChanged', 'InsertLeave' }, {
         buffer = event.buf,
         group = nested,
         nested = true,
         callback = function(e)
-          if e.event == 'LspNotify' and e.data.method ~= 'textDocument/didOpen' then
-            return
-          end
           for _, wkr in pairs(state.get(e.buf)) do
             wkr:run(true)
           end
         end,
       })
+
+      if vim.fn.has('nvim-0.10') ~= 0 then
+        vim.api.nvim_create_autocmd({ 'LspNotify' }, {
+          buffer = event.buf,
+          group = nested,
+          nested = true,
+          callback = function(e)
+            if e.event == 'LspNotify' and e.data.method ~= 'textDocument/didOpen' then
+              return
+            end
+            for _, wkr in pairs(state.get(e.buf)) do
+              wkr:run(true)
+            end
+          end,
+        })
+      end
 
       -- Force refresh on BufEnter
       vim.api.nvim_create_autocmd('BufEnter', {
