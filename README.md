@@ -37,10 +37,15 @@ Default options values:
 ```lua
 local SymbolKind = vim.lsp.protocol.SymbolKind
 
+---@type UserOpts
 local default_opts = {
+  ---@type table<string, any> `nvim_set_hl`-like options for highlight virtual text
   hl = { link = 'Comment' },
+  ---@type lsp.SymbolKind[] Symbol kinds what need to be count (see `lsp.SymbolKind`)
   kinds = { SymbolKind.Function, SymbolKind.Method },
+  ---@type 'above'|'end_of_line'|'textwidth'
   vt_position = 'above',
+  ---@type function(symbol: Symbol): string
   text_format = function(symbol)
     -- keep it first `nil` for correct concat
     local refs, defs, impls
@@ -64,6 +69,7 @@ local default_opts = {
   references = { enabled = true, include_declaration = false },
   definition = { enabled = false },
   implementation = { enabled = false },
+  ---@type UserOpts[]
   filetypes = {},
 }
 ```
@@ -110,7 +116,7 @@ SymbolKind = {
 ## TODO
 
 - [ ] Different highlighting groups for references, definitions and implementations;
-- [ ] Different symbol kinds  for references, definitions and implementations;
+- [ ] Different symbol kinds for references, definitions and implementations;
 - [ ] Custom filter for symbol kinds;
 - [ ] First, query the data for the symbols that are currently on the screen;
 - [ ] Option to show only on current line;
