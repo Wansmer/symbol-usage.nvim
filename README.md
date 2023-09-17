@@ -2,6 +2,12 @@
 
 Plugin to display references, definitions and implementations of document symbols with a view like JetBrains Idea.
 
+<img width="724" alt="Снимок экрана 2023-09-17 в 17 50 35" src="https://github.com/Wansmer/symbol-usage.nvim/assets/46977173/c13fb043-7cd1-47e3-8f20-8853a44c7067">
+
+<img width="715" alt="Снимок экрана 2023-09-17 в 17 51 14" src="https://github.com/Wansmer/symbol-usage.nvim/assets/46977173/d5aeefdb-6147-48a5-9a70-fdfead151635">
+
+<img width="712" alt="Снимок экрана 2023-09-17 в 17 51 47" src="https://github.com/Wansmer/symbol-usage.nvim/assets/46977173/578ab051-fd1f-4f70-98a5-f05307a5fb8b">
+
 ## Features
 
 - Shows references, definitions and implementations as virtual text;
