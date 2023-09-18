@@ -19,8 +19,10 @@ function M.attach()
       end
 
       local w = worker.new(event.buf, client)
-      w:run(false)
-      state.add_worker(event.buf, w)
+      local need_run = state.add_worker(event.buf, w)
+      if need_run then
+        w:run(false)
+      end
 
       vim.api.nvim_create_autocmd({ 'TextChanged', 'InsertLeave' }, {
         buffer = event.buf,
@@ -56,7 +58,7 @@ function M.attach()
         nested = true,
         callback = function(e)
           for _, wkr in pairs(state.get(e.buf)) do
-            wkr:run(false)
+            wkr:run(false, e.event)
           end
         end,
       })
