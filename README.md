@@ -16,6 +16,10 @@ Plugin to display references, definitions and implementations of document symbol
 - Fully customizable: can be customized for different languages or use with default config for all;
 - Ignores unnecessary requests to Lsp;
 
+## Requirements
+
+Neovim >= 0.9.0
+
 ## Installation
 
 With `lazy.nvim`:
