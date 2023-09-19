@@ -1,7 +1,7 @@
 local u = require('symbol-usage.utils')
 local o = require('symbol-usage.options')
 
-local ns = vim.api.nvim_create_namespace('__symbol__')
+local ns = u.NS
 
 ---@alias Method 'references'|'definition'|'implementation'
 
