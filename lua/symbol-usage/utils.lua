@@ -1,5 +1,9 @@
 local M = {}
 
+M.NS = vim.api.nvim_create_namespace('__symbol__')
+M.GROUP = vim.api.nvim_create_augroup('__symbol__', { clear = true })
+M.NESTED_GROUP = vim.api.nvim_create_augroup('__symbol_nested__', { clear = true })
+
 ---Check if client supports method
 ---@param client lsp.Client
 ---@param method string
