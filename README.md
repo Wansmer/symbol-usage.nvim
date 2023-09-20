@@ -116,6 +116,22 @@ SymbolKind = {
 
 </details>
 
+## API
+
+Setup `symbol-usage`:
+
+```lua
+---Setup `symbol-usage`
+---@param opts UserOpts
+require('symbol-usage').setup(opts)
+```
+
+Toggle virtual text for current buffer:
+
+```lua
+require('symbol-usage').toggle()
+```
+
 ## TODO
 
 - [ ] Different highlighting groups for references, definitions and implementations;
