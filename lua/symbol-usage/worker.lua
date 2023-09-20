@@ -170,6 +170,10 @@ function W:count_method(method, symbol_id, symbol)
   end
 
   local params = self:make_params(symbol, method)
+  if not params then
+    return
+  end
+
   local function handler(err, response, ctx)
     if err then
       return
@@ -204,9 +208,25 @@ end
 ---Make params for lsp method request
 ---@param symbol table
 ---@param method Method Method name without 'textDocument/', e.g. 'references'|'definition'|'implementation'
+---@return table|nil returns nil if symbol have not 'selectionRange' or 'range' field
 function W:make_params(symbol, method)
+  -- First search 'selectionRange' because it gives range to name the symbol
+  local position = u.get_nested_key_value(symbol, 'selectionRange')
+  -- If 'selectionRange' is found, use last character of name as point to send request
+  local place = 'end'
+  if not position then
+    -- If 'selectionRange' does not exist, search 'range' (range includes whole body of symbol)
+    position = u.get_nested_key_value(symbol, 'range')
+    -- For 'range' need to use 'start' range
+    place = 'start'
+  end
+
+  if not position then
+    return nil
+  end
+
   local params = {
-    position = symbol.selectionRange['end'],
+    position = position[place],
     textDocument = { uri = vim.uri_from_bufnr(0) },
   }
 
