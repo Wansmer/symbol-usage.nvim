@@ -192,9 +192,6 @@ function W:count_method(method, symbol_id, symbol)
     local id
 
     if record.mark_id then
-      if record[method] == count then
-        return
-      end
       id = record.mark_id
     end
 
