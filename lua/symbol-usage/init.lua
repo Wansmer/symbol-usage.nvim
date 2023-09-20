@@ -5,7 +5,11 @@ local buf = require('symbol-usage.buf')
 
 local M = {}
 
-function M.attach()
+---Setup `symbol-usage`
+---@param opts UserOpts
+function M.setup(opts)
+  options.update(opts or {})
+
   vim.api.nvim_create_autocmd({ 'LspAttach' }, {
     group = u.GROUP,
     callback = function(event)
@@ -19,13 +23,6 @@ function M.attach()
       buf.clear_buffer(event.buf)
     end,
   })
-end
-
----Setup `symbol-usage`
----@param opts UserOpts
-function M.setup(opts)
-  options.update(opts or {})
-  M.attach()
 end
 
 function M.toggle()
