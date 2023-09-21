@@ -149,5 +149,5 @@ require('symbol-usage').toggle()
 ## Known issues and restriction
 
 - No shows virtual text above first line ([#16166](https://github.com/neovim/neovim/issues/16166));
-- When virtual text ia above, uses `LineNr` instead of `CursorLineNr` for symbol's line even it current line (actual, if you use number with `statuscolumn`);
+- When virtual text ia above, uses `LineNr` instead of `CursorLineNr` for symbol's line even it current line (actual, if you use number with `statuscolumn`) (UPD: fixed at [#25277](https://github.com/neovim/neovim/pull/25277));
 - Some clients don't recognize anonymous functions and closures like `SymbolKind.Function` (e.g., tsserver, rust-analyzer)
