@@ -53,7 +53,7 @@ local default_opts = {
   ---created until the request is finished. Recommended to use with `above`
   ---vt_position to avoid "jumping lines".
   ---@type string|false
-  request_pending_text = '',
+  request_pending_text = 'loading...',
   ---@type function(symbol: Symbol): string Symbol{ definition = integer|nil, implementation = integer|nil, references = integer|nil }
   text_format = function(symbol)
     local fragments = {}
