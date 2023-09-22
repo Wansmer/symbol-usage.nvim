@@ -53,6 +53,8 @@ end
 function W:collect_symbols()
   local function handler(_, response, ctx)
     if not response or vim.tbl_isempty(response) then
+      -- When the entire buffer content is deleted
+      self:clear_unused_symbols({})
       return
     end
 
