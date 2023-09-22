@@ -199,7 +199,7 @@ function W:count_method(method, symbol_id, symbol)
     local record = self.symbols[symbol_id]
     local id
 
-    if record.mark_id then
+    if record and record.mark_id then
       id = record.mark_id
     end
 
