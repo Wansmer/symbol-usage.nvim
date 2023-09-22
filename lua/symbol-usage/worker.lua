@@ -83,14 +83,32 @@ function W:clear_unused_symbols(actual_symbols)
   end
 end
 
-function W:is_need_count(kind, method)
+---Check if the current symbol needs to be counted
+---@param symbol table
+---@param method Method
+---@return boolean
+function W:is_need_count(symbol, method)
   if not self.opts[method].enabled then
-    return
+    return false
   end
+
+  local kind = symbol.kind
 
   local kinds = self.opts[method].kinds or self.opts.kinds
   ---@diagnostic disable-next-line: param-type-mismatch
   return vim.tbl_contains(kinds, kind)
+end
+
+---Add empty table to symbol_id in symbols
+---@param symbol_id string
+---@param pos table
+function W:mock_symbol(symbol_id, pos)
+  local mock = {}
+  if self.opts.request_pending_text then
+    -- Book a place for a virtual text
+    mock = { mark_id = self:set_extmark(symbol_id, pos.line) }
+  end
+  self.symbols[symbol_id] = mock
 end
 
 ---Traverse and collect document symbols
@@ -99,25 +117,23 @@ end
 function W:traversal(symbol_tree)
   local function _walk(data, prefix, actual)
     for _, symbol in ipairs(data) do
-      local symbol_id = prefix .. symbol.kind .. symbol.name
+      local pos = u.get_position(symbol)
+      -- If not `pos`, the following actions are useless
+      if pos then
+        local symbol_id = table.concat({ prefix, symbol.kind, symbol.name })
 
-      for _, method in ipairs({ 'references', 'definition', 'implementation' }) do
-        if self:is_need_count(symbol.kind, method) then
-          -- If symbol is new, add mock
-          if not self.symbols[symbol_id] then
-            local mock = {}
-            local pos = u.get_position(symbol)
-            -- Book a place for a virtual text
-            if pos and self.opts.request_pending_text then
-              mock = { mark_id = self:set_extmark(symbol_id, pos.line) }
+        for _, method in ipairs({ 'references', 'definition', 'implementation' }) do
+          if self:is_need_count(symbol, method) then
+            -- If symbol is new, add mock
+            if not self.symbols[symbol_id] then
+              self:mock_symbol(symbol_id, pos)
             end
-            self.symbols[symbol_id] = mock
+
+            -- Collect actual symbols to remove irrelevant ones afterwards
+            actual[symbol_id] = true
+
+            self:count_method(method, symbol_id, symbol)
           end
-
-          -- Collect actual symbols to remove irrelevant ones afterwards
-          actual[symbol_id] = true
-
-          self:count_method(method, symbol_id, symbol)
         end
       end
 
@@ -200,7 +216,7 @@ end
 ---Make params for lsp method request
 ---@param symbol table
 ---@param method Method Method name without 'textDocument/', e.g. 'references'|'definition'|'implementation'
----@return table|nil returns nil if symbol have not 'selectionRange' or 'range' field
+---@return table? returns nil if symbol have not 'selectionRange' or 'range' field
 function W:make_params(symbol, method)
   local position = u.get_position(symbol)
   if not position then
