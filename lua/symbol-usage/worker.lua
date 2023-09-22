@@ -91,7 +91,6 @@ function W:is_need_count(kind, method)
   local kinds = self.opts[method].kinds or self.opts.kinds
   ---@diagnostic disable-next-line: param-type-mismatch
   return vim.tbl_contains(kinds, kind)
-  -- return vim.list_contains(kinds, kind)
 end
 
 ---Traverse and collect document symbols
@@ -102,16 +101,22 @@ function W:traversal(symbol_tree)
     for _, symbol in ipairs(data) do
       local symbol_id = prefix .. symbol.kind .. symbol.name
 
-      -- If symbol is new, add mock
-      if not self.symbols[symbol_id] then
-        self.symbols[symbol_id] = {}
-      end
-
-      -- Collect actual symbols to remove irrelevant ones afterwards
-      actual[symbol_id] = true
-
       for _, method in ipairs({ 'references', 'definition', 'implementation' }) do
         if self:is_need_count(symbol.kind, method) then
+          -- If symbol is new, add mock
+          if not self.symbols[symbol_id] then
+            local mock = {}
+            local pos = u.get_position(symbol)
+            -- Book a place for a virtual text
+            if pos and self.opts.request_pending_text then
+              mock = { mark_id = self:set_extmark(symbol_id, pos.line) }
+            end
+            self.symbols[symbol_id] = mock
+          end
+
+          -- Collect actual symbols to remove irrelevant ones afterwards
+          actual[symbol_id] = true
+
           self:count_method(method, symbol_id, symbol)
         end
       end
@@ -127,39 +132,24 @@ function W:traversal(symbol_tree)
   return _walk(symbol_tree, '', {})
 end
 
+---Set or update extmark.
+---@param symbol_id string Symbol id
+---@param line integer 0-index line number
+---@param count table<Method, integer>|nil
+---@param id integer|nil
+---@return integer? Extmark id
 function W:set_extmark(symbol_id, line, count, id)
-  count = vim.tbl_deep_extend('force', self.symbols[symbol_id], count)
-
-  local text = self.opts.text_format(count)
-
-  if self.opts.vt_position == 'above' then
-    local indent = vim.fn.indent(line + 1)
-    if indent and indent > 0 then
-      text = (' '):rep(indent) .. text
-    end
+  local text = self.opts.request_pending_text
+  if self.symbols[symbol_id] and count then
+    count = vim.tbl_deep_extend('force', self.symbols[symbol_id], count)
+    text = self.opts.text_format(count)
   end
 
-  local vtext = { { text, 'SymbolUsageText' } }
-  local modes = {
-    end_of_line = {
-      virt_text_pos = 'eol',
-      virt_text = vtext,
-    },
-    textwidth = {
-      virt_text = vtext,
-      virt_text_win_col = tonumber(vim.bo.textwidth) - (#text + 1),
-    },
-    above = {
-      virt_lines = { vtext },
-      virt_lines_above = true,
-    },
-  }
+  if not text then
+    return
+  end
 
-  local opts = vim.tbl_extend('force', modes[self.opts.vt_position], {
-    id = id,
-    hl_mode = 'combine',
-  })
-
+  local opts = u.make_extmark_opts(text, self.opts.vt_position, line, id)
   return vim.api.nvim_buf_set_extmark(self.bufnr, ns, line, 0, opts)
 end
 
@@ -197,8 +187,11 @@ function W:count_method(method, symbol_id, symbol)
       id = record.mark_id
     end
 
-    record.mark_id = self:set_extmark(symbol_id, params.position.line, { [method] = count }, id)
-    record[method] = count
+    id = self:set_extmark(symbol_id, params.position.line, { [method] = count }, id)
+    if id then
+      record.mark_id = id
+      record[method] = count
+    end
   end
 
   self.client.request('textDocument/' .. method, params, handler, self.bufnr)
@@ -209,25 +202,12 @@ end
 ---@param method Method Method name without 'textDocument/', e.g. 'references'|'definition'|'implementation'
 ---@return table|nil returns nil if symbol have not 'selectionRange' or 'range' field
 function W:make_params(symbol, method)
-  -- First search 'selectionRange' because it gives range to name the symbol
-  local position = u.get_nested_key_value(symbol, 'selectionRange')
-  -- If 'selectionRange' is found, use last character of name as point to send request
-  local place = 'end'
+  local position = u.get_position(symbol)
   if not position then
-    -- If 'selectionRange' does not exist, search 'range' (range includes whole body of symbol)
-    position = u.get_nested_key_value(symbol, 'range')
-    -- For 'range' need to use 'start' range
-    place = 'start'
+    return
   end
 
-  if not position then
-    return nil
-  end
-
-  local params = {
-    position = position[place],
-    textDocument = { uri = vim.uri_from_bufnr(0) },
-  }
+  local params = { position = position, textDocument = { uri = vim.uri_from_bufnr(0) } }
 
   if method == 'references' then
     params.context = { includeDeclaration = self.opts.references.include_declaration }
