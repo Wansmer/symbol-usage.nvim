@@ -87,9 +87,10 @@ end
 ---@param text string Virtual text
 ---@param pos VTPosition
 ---@param line integer 0-index line number
+---@param bufnr integer Buffer id
 ---@param id integer|nil Extmark id
 ---@return table Opts for |nvim_buf_set_extmark()|
-function M.make_extmark_opts(text, pos, line, id)
+function M.make_extmark_opts(text, pos, line, bufnr, id)
   local vtext = { { text, 'SymbolUsageText' } }
 
   local modes = {
@@ -97,13 +98,17 @@ function M.make_extmark_opts(text, pos, line, id)
       return { virt_text_pos = 'eol', virt_text = vtext }
     end,
     textwidth = function()
-      return { virt_text = vtext, virt_text_win_col = tonumber(vim.bo.textwidth) - (#text + 1) }
+      return { virt_text = vtext, virt_text_win_col = tonumber(vim.bo[bufnr].textwidth) - (#text + 1) }
     end,
     above = function()
-      local indent = vim.fn.indent(line + 1)
-      if indent and indent > 0 then
-        vtext[1][1] = (' '):rep(indent) .. text
+      -- |vim.fn.indent()| is not convenient because it can't be specified for a specific buffer.
+      -- Buffer can be another if this function is called
+      local ok, l = pcall(vim.api.nvim_buf_get_lines, bufnr, line, line + 1, true)
+      local indent = ''
+      if ok then
+        indent = l[1]:match('^(%s*)')
       end
+      vtext[1][1] = indent .. text
       return { virt_lines = { vtext }, virt_lines_above = true }
     end,
   }
