@@ -204,7 +204,7 @@ function W:count_method(method, symbol_id, symbol)
     end
 
     id = self:set_extmark(symbol_id, params.position.line, { [method] = count }, id)
-    if id then
+    if record and id then
       record.mark_id = id
       record[method] = count
     end
