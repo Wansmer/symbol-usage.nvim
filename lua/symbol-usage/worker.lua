@@ -165,7 +165,7 @@ function W:set_extmark(symbol_id, line, count, id)
     return
   end
 
-  local opts = u.make_extmark_opts(text, self.opts.vt_position, line, id)
+  local opts = u.make_extmark_opts(text, self.opts.vt_position, line, self.bufnr, id)
   return vim.api.nvim_buf_set_extmark(self.bufnr, ns, line, 0, opts)
 end
 
