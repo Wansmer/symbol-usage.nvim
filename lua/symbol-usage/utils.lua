@@ -60,4 +60,55 @@ function M.get_nested_key_value(tbl, target_key)
   return nil
 end
 
+---Get effective position of symbol.
+---First, it searches for 'selectionRange' and takes the position of the last letter of the symbol
+---name as the position for subsequent queries. If 'selectionRange' is not found, it looks for
+---'range' and takes the position of the first letter of the symbol name. If nothing is found, nil
+---is returned.
+---Explanation: Different clients return symbol data with different structures.
+---@param symbol table Item from 'textDocument/documentSymbol' response
+---@return table?
+function M.get_position(symbol)
+  -- First search 'selectionRange' because it gives range to name the symbol
+  local position = M.get_nested_key_value(symbol, 'selectionRange')
+  -- If 'selectionRange' is found, use last character of name as point to send request
+  local place = 'end'
+  if not position then
+    -- If 'selectionRange' does not exist, search 'range' (range includes whole body of symbol)
+    position = M.get_nested_key_value(symbol, 'range')
+    -- For 'range' need to use 'start' range
+    place = 'start'
+  end
+
+  return position and position[place]
+end
+
+---Make opts for extmark according opts.vt_position
+---@param text string Virtual text
+---@param pos VTPosition
+---@param line integer 0-index line number
+---@param id integer|nil Extmark id
+---@return table Opts for |nvim_buf_set_extmark()|
+function M.make_extmark_opts(text, pos, line, id)
+  local vtext = { { text, 'SymbolUsageText' } }
+
+  local modes = {
+    end_of_line = function()
+      return { virt_text_pos = 'eol', virt_text = vtext }
+    end,
+    textwidth = function()
+      return { virt_text = vtext, virt_text_win_col = tonumber(vim.bo.textwidth) - (#text + 1) }
+    end,
+    above = function()
+      local indent = vim.fn.indent(line + 1)
+      if indent and indent > 0 then
+        vtext[1][1] = (' '):rep(indent) .. text
+      end
+      return { virt_lines = { vtext }, virt_lines_above = true }
+    end,
+  }
+
+  return vim.tbl_extend('force', modes[pos](), { id = id, hl_mode = 'combine' })
+end
+
 return M

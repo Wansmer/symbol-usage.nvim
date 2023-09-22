@@ -47,9 +47,14 @@ local default_opts = {
   hl = { link = 'Comment' },
   ---@type lsp.SymbolKind[] Symbol kinds what need to be count (see `lsp.SymbolKind`)
   kinds = { SymbolKind.Function, SymbolKind.Method },
-  ---@type 'above'|'end_of_line'|'textwidth'
+  ---@type 'above'|'end_of_line'|'textwidth' above by default
   vt_position = 'above',
-  ---@type function(symbol: Symbol): string
+  ---Text to display when request is pending. If `false`, extmark will not be
+  ---created until the request is finished. Recommended to use with `above`
+  ---vt_position to avoid "jumping lines".
+  ---@type string|false
+  request_pending_text = 'loading...',
+  ---@type function(symbol: Symbol): string Symbol{ definition = integer|nil, implementation = integer|nil, references = integer|nil }
   text_format = function(symbol)
     local fragments = {}
 
