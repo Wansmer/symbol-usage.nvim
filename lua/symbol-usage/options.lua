@@ -22,6 +22,7 @@ local SymbolKind = vim.lsp.protocol.SymbolKind
 ---@field definition? DefinitionOpts Opts for definitions
 ---@field implementation? ImplementationOpts Opts for implementations
 ---@field vt_position? VTPosition Virtual text position (`above` by default)
+---@field request_pending_text? string|nil Text to show when request is pending. If nil, extmark will create only when request is done
 ---@field filetypes UserOpts[] To override opts for specific filetypes. Missing field came from common opts
 
 local S = {}
@@ -31,6 +32,7 @@ S._default_opts = {
   hl = { link = 'Comment' },
   kinds = { SymbolKind.Function, SymbolKind.Method },
   vt_position = 'above',
+  request_pending_text = '',
   text_format = function(symbol)
     local fragments = {}
 

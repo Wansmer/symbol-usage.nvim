@@ -49,6 +49,8 @@ local default_opts = {
   kinds = { SymbolKind.Function, SymbolKind.Method },
   ---@type 'above'|'end_of_line'|'textwidth'
   vt_position = 'above',
+  ---@type string|nil Text to show when request is pending. If nil, extmark will create only when request is done
+  request_pending_text = '',
   ---@type function(symbol: Symbol): string
   text_format = function(symbol)
     local fragments = {}
