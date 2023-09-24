@@ -12,11 +12,13 @@ local SymbolKind = vim.lsp.protocol.SymbolKind
 
 ---@alias Formater function(symbol: Symbol): string
 ---@alias VTPosition 'above'|'end_of_line'|'textwidth'
+---@alias filterKind function(symbol: table, parent: table): boolean
 
 ---User options to `symbol-usage.nvim`
 ---@class UserOpts
 ---@field hl? table<string, any> `nvim_set_hl`-like options for highlight virtual text
 ---@field kinds? lsp.SymbolKind[] Symbol kinds what need to be count (see `lsp.SymbolKind`)
+---@field kinds_filter? table<lsp.SymbolKind, filterKind[]> Additional filter for kinds
 ---@field text_format? Formater Function to format virtual text
 ---@field references? ReferencesOpts Opts for references
 ---@field definition? DefinitionOpts Opts for definitions
@@ -31,6 +33,7 @@ local S = {}
 S._default_opts = {
   hl = { link = 'Comment' },
   kinds = { SymbolKind.Function, SymbolKind.Method },
+  kinds_filter = {},
   vt_position = 'above',
   request_pending_text = 'loading...',
   text_format = function(symbol)
