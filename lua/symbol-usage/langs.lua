@@ -59,6 +59,11 @@ return {
               return false
             end
           end
+
+          -- If anonymous table with function is returned (e.g. lazy plugin spec)
+          if data.parent.detail and (vim.startswith(data.parent.detail, '{') and vim.endswith(data.parent.detail, '}')) then
+            return false
+          end
           return true
         end,
       },
