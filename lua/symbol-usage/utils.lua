@@ -37,6 +37,20 @@ function M.some(tbl, cb)
   return false
 end
 
+function M.every(tbl, cb)
+  if not vim.tbl_islist(tbl) or vim.tbl_isempty(tbl) then
+    return false
+  end
+
+  for _, item in ipairs(tbl) do
+    if not cb(item) then
+      return false
+    end
+  end
+
+  return true
+end
+
 ---Recursively finding key in table and return its value if found or nil
 ---@param tbl table|nil Dict-like table
 ---@param target_key string Name of target key
