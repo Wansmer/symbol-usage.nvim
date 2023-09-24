@@ -58,7 +58,36 @@ S._default_opts = {
   references = { enabled = true, include_declaration = false },
   definition = { enabled = false },
   implementation = { enabled = false },
-  filetypes = {},
+  filetypes = {
+    lua = {
+      kinds_filter = {
+        [SymbolKind.Function] = {
+          function(symbol, _)
+            -- If function is inside a list-like table, its usage will always be 0.
+            -- It's useless and doesn't need to be counted.
+            -- It's name will be something like "[1]".
+            if symbol.name:match('%[%d%]') then
+              return false
+            end
+            return true
+          end,
+          function(symbol, parent)
+            -- It looks like in lua_ls, anonymous arguments are prefixed with `->` in the
+            -- `detail` field. The anonymous function itself can be passed as an argument. Or it
+            -- can be assigned to an anonymous table field. So we check both the function and
+            -- the parent.
+            local details = { symbol.detail, parent.detail }
+            for _, detail in ipairs(details) do
+              if detail and vim.startswith(detail, '->') then
+                return false
+              end
+            end
+            return true
+          end,
+        },
+      },
+    },
+  },
 }
 
 S.opts = {}
