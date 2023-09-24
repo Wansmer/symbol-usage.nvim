@@ -102,7 +102,7 @@ function W:is_need_count(symbol, method, parent)
   local matches_filter = true
   if (matches_kind and filters) and not vim.tbl_isempty(filters) then
     matches_filter = u.every(filters, function(filter)
-      return filter(symbol, parent)
+      return filter({ symbol = symbol, parent = parent, bufnr = self.bufnr })
     end)
   end
 
