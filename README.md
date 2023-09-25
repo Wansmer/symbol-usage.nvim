@@ -1,6 +1,19 @@
 # symbol-usage.nvim
 
-Plugin to display references, definitions and implementations of document symbols with a view like JetBrains Idea.
+Plugin to display references, definitions, and implementations of document symbols with a view like JetBrains Idea.
+
+<!--toc:start-->
+
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Setup](#setup)
+- [Filter kinds](#filter-kinds)
+- [API](#api)
+- [TODO](#todo)
+- [Other sources with similar feature](#other-sources-with-similar-feature)
+- [Known issues and restriction](#known-issues-and-restriction)
+<!--toc:end-->
 
 <img width="724" alt="Снимок экрана 2023-09-17 в 17 50 35" src="https://github.com/Wansmer/symbol-usage.nvim/assets/46977173/c13fb043-7cd1-47e3-8f20-8853a44c7067">
 
@@ -10,11 +23,11 @@ Plugin to display references, definitions and implementations of document symbol
 
 ## Features
 
-- Shows references, definitions and implementations as virtual text;
-- Three options for display virtual text: above the line, end of line or near with colorcolumn;
-- Works with Lsp servers even client do not support `textDocument/codeLens` feature;
+- Shows references, definitions, and implementations as virtual text;
+- Three options for display virtual text: above the line, end of line or near with textwidth;
+- Works with LSP servers even client do not support `textDocument/codeLens` feature;
 - Fully customizable: can be customized for different languages or use with default config for all;
-- Ignores unnecessary requests to Lsp;
+- Ignores unnecessary requests to LSP;
 
 ## Requirements
 
@@ -47,6 +60,12 @@ local default_opts = {
   hl = { link = 'Comment' },
   ---@type lsp.SymbolKind[] Symbol kinds what need to be count (see `lsp.SymbolKind`)
   kinds = { SymbolKind.Function, SymbolKind.Method },
+  ---Additional filter for kinds. Recommended use in the filetypes override table.
+  ---fiterKind: function(data: { symbol:table, parent:table, bufnr:integer }): boolean
+  ---`symbol` and `parent` is an item from `textDocument/documentSymbol` request
+  ---See: #filter-kinds
+  ---@type table<lsp.SymbolKind, filterKind[]>
+  kinds_filter = {},
   ---@type 'above'|'end_of_line'|'textwidth' above by default
   vt_position = 'above',
   ---Text to display when request is pending. If `false`, extmark will not be
@@ -77,8 +96,8 @@ local default_opts = {
   references = { enabled = true, include_declaration = false },
   definition = { enabled = false },
   implementation = { enabled = false },
-  ---@type UserOpts[]
-  filetypes = {},
+  ---@type UserOpts[] See default overridings in `lua/symbol-usage/langs.lua`
+  -- filetypes = {},
 }
 ```
 
@@ -86,7 +105,7 @@ local default_opts = {
 
 <summary>see SymbolKind</summary>
 
-From: https://github.com/neovim/neovim/blob/211edceb4f4d4d0f6c41a6ee56891a6f9407e3a7/runtime/lua/vim/lsp/protocol.lua#L119
+From [LSP spec](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#symbolKind):
 
 ```lua
 SymbolKind = {
@@ -121,6 +140,17 @@ SymbolKind = {
 
 </details>
 
+## Filtering kinds
+
+Each LSP server processes requests and returns results differently. Therefore, it is impossible to set general settings that are completely suitable for every programming language.
+
+For example, in `javascipt` arrow functions are not defined as `SymbolKind.Function`, but as `SymbolKind.Variable` or `SymbolKind.Constant`.
+
+I would like to know how many times an arrow function is used, but keeping track of all variables is not informative.
+For this purpose, you can define additional filters that will check that the variable contains exactly the function and not some other value.
+
+You can see implementation examples [here](lua/symbol-usage/langs.lua).
+
 ## API
 
 Setup `symbol-usage`:
@@ -137,11 +167,17 @@ Toggle virtual text for current buffer:
 require('symbol-usage').toggle()
 ```
 
+Refresh current buffer:
+
+```lua
+require('symbol-usage').refresh()
+```
+
 ## TODO
 
-- [ ] Different highlighting groups for references, definitions and implementations;
-- [ ] Different symbol kinds for references, definitions and implementations;
-- [ ] Custom filter for symbol kinds;
+- [x] Custom filter for symbol kinds;
+- [ ] Different highlighting groups for references, definitions, and implementations;
+- [ ] Different symbol kinds for references, definitions, and implementations;
 - [ ] First, query the data for the symbols that are currently on the screen;
 - [ ] Option to show only on current line;
 

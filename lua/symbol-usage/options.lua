@@ -19,7 +19,7 @@ local SymbolKind = vim.lsp.protocol.SymbolKind
 ---@class UserOpts
 ---@field hl? table<string, any> `nvim_set_hl`-like options for highlight virtual text
 ---@field kinds? lsp.SymbolKind[] Symbol kinds what need to be count (see `lsp.SymbolKind`)
----@field kinds_filter? table<lsp.SymbolKind, filterKind[]> Additional filter for kinds
+---@field kinds_filter? table<lsp.SymbolKind, filterKind[]> Additional filter for kinds. Recommended use in the filetypes override table.
 ---@field text_format? Formater Function to format virtual text
 ---@field references? ReferencesOpts Opts for references
 ---@field definition? DefinitionOpts Opts for definitions
@@ -72,7 +72,7 @@ S._default_opts = {
 S.opts = {}
 
 function S.update(user_opts)
-  -- To avoid mergins with link
+  -- To avoid merging with link
   local hl = user_opts.hl
   S.opts = vim.tbl_deep_extend('force', S._default_opts, user_opts)
   if not hl then
