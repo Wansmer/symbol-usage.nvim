@@ -1,3 +1,4 @@
+local langs = require('symbol-usage.langs')
 local SymbolKind = vim.lsp.protocol.SymbolKind
 
 ---@class ReferencesOpts
@@ -12,11 +13,13 @@ local SymbolKind = vim.lsp.protocol.SymbolKind
 
 ---@alias Formater function(symbol: Symbol): string
 ---@alias VTPosition 'above'|'end_of_line'|'textwidth'
+---@alias filterKind function(data: { symbol:table, parent:table, bufnr:integer }): boolean
 
 ---User options to `symbol-usage.nvim`
 ---@class UserOpts
 ---@field hl? table<string, any> `nvim_set_hl`-like options for highlight virtual text
 ---@field kinds? lsp.SymbolKind[] Symbol kinds what need to be count (see `lsp.SymbolKind`)
+---@field kinds_filter? table<lsp.SymbolKind, filterKind[]> Additional filter for kinds. Recommended use in the filetypes override table.
 ---@field text_format? Formater Function to format virtual text
 ---@field references? ReferencesOpts Opts for references
 ---@field definition? DefinitionOpts Opts for definitions
@@ -31,6 +34,7 @@ local S = {}
 S._default_opts = {
   hl = { link = 'Comment' },
   kinds = { SymbolKind.Function, SymbolKind.Method },
+  kinds_filter = {},
   vt_position = 'above',
   request_pending_text = 'loading...',
   text_format = function(symbol)
@@ -55,13 +59,20 @@ S._default_opts = {
   references = { enabled = true, include_declaration = false },
   definition = { enabled = false },
   implementation = { enabled = false },
-  filetypes = {},
+  filetypes = {
+    lua = langs.lua,
+    javascript = langs.javascript,
+    typescript = langs.javascript,
+    typescriptreact = langs.javascript,
+    javascriptreact = langs.javascript,
+    vue = langs.javascript,
+  },
 }
 
 S.opts = {}
 
 function S.update(user_opts)
-  -- To avoid mergins with link
+  -- To avoid merging with link
   local hl = user_opts.hl
   S.opts = vim.tbl_deep_extend('force', S._default_opts, user_opts)
   if not hl then

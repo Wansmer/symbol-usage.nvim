@@ -86,8 +86,9 @@ end
 ---Check if the current symbol needs to be counted
 ---@param symbol table
 ---@param method Method
+---@param parent table Uses in kinds_filters
 ---@return boolean
-function W:is_need_count(symbol, method)
+function W:is_need_count(symbol, method, parent)
   if not self.opts[method].enabled then
     return false
   end
@@ -96,7 +97,16 @@ function W:is_need_count(symbol, method)
 
   local kinds = self.opts[method].kinds or self.opts.kinds
   ---@diagnostic disable-next-line: param-type-mismatch
-  return vim.tbl_contains(kinds, kind)
+  local matches_kind = vim.tbl_contains(kinds, kind)
+  local filters = self.opts.kinds_filter[kind]
+  local matches_filter = true
+  if (matches_kind and filters) and not vim.tbl_isempty(filters) then
+    matches_filter = u.every(filters, function(filter)
+      return filter({ symbol = symbol, parent = parent, bufnr = self.bufnr })
+    end)
+  end
+
+  return matches_kind and matches_filter
 end
 
 ---Add empty table to symbol_id in symbols
@@ -115,15 +125,19 @@ end
 ---@param symbol_tree table
 ---@return table
 function W:traversal(symbol_tree)
-  local function _walk(data, prefix, actual)
+  local function _walk(data, parent, actual)
     for _, symbol in ipairs(data) do
       local pos = u.get_position(symbol)
       -- If not `pos`, the following actions are useless
       if pos then
-        local symbol_id = table.concat({ prefix, symbol.kind, symbol.name })
+        local symbol_id = table.concat({
+          parent and parent.name or '',
+          symbol.kind,
+          symbol.name,
+        })
 
         for _, method in ipairs({ 'references', 'definition', 'implementation' }) do
-          if self:is_need_count(symbol, method) then
+          if self:is_need_count(symbol, method, parent) then
             -- If symbol is new, add mock
             if not self.symbols[symbol_id] then
               self:mock_symbol(symbol_id, pos)
@@ -138,7 +152,7 @@ function W:traversal(symbol_tree)
       end
 
       if symbol.children and not vim.tbl_isempty(symbol.children) then
-        _walk(symbol.children, symbol.name, actual)
+        _walk(symbol.children, symbol, actual)
       end
     end
 
