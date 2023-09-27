@@ -8,7 +8,7 @@ Plugin to display references, definitions, and implementations of document symbo
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Setup](#setup)
-- [Filter kinds](#filter-kinds)
+- [Filter kinds](#filtering-kinds)
 - [API](#api)
 - [TODO](#todo)
 - [Other sources with similar feature](#other-sources-with-similar-feature)
