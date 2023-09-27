@@ -143,7 +143,7 @@ function W:traversal(symbol_tree)
               self:mock_symbol(symbol_id, pos)
             end
 
-            -- Collect actual symbols to remove irrelevant ones afterwards
+            -- Collect actual symbols to remove irrelevant ones afterward
             actual[symbol_id] = true
 
             self:count_method(method, symbol_id, symbol)
@@ -208,7 +208,7 @@ function W:count_method(method, symbol_id, symbol)
       end
     end
 
-    -- Some clients return `nil` if there are no references (e.g. `lua_ls`)
+    -- Some clients return `nil` if there are no references (e.g., `lua_ls`)
     local count = response and #response or 0
     local record = self.symbols[symbol_id]
     local id
