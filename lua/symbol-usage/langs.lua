@@ -1,14 +1,30 @@
 local SymbolKind = vim.lsp.protocol.SymbolKind
 
+---Checs if ts attached to buffer
+---@param bufnr integer Buffer id
+---@return boolean
+local function is_ts(bufnr)
+  local ok, _ = pcall(vim.treesitter.get_parser, bufnr)
+  return ok
+end
+
 local filter_js_vars = {
   function(data)
     local symbol, _, bufnr = data.symbol, data.parent, data.bufnr
-    local ln = symbol.range.start.line
-    local text = vim.api.nvim_buf_get_lines(bufnr, ln, ln + 1, true)[1]
-    if text:find('function') or text:find('=>') then
-      return true
+    if is_ts(bufnr) then
+      local pos = { symbol.range.start.line, symbol.range.start.character }
+      local node = vim.treesitter.get_node({ bufrn = bufnr, pos = pos })
+      if node and node:type() == 'identifier' and node:parent():type() == 'variable_declarator' then
+        local value = node:parent():field('value')[1]
+        return vim.tbl_contains({ 'arrow_function', 'function' }, value and value:type() or '')
+      end
+      return false
+    else
+      -- Fallback to check if treesitter is not attached
+      local ln = symbol.range.start.line
+      local text = vim.api.nvim_buf_get_lines(bufnr, ln, ln + 1, true)[1]
+      return text:find('function') or text:find('=>')
     end
-    return false
   end,
 }
 
