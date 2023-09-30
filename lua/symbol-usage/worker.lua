@@ -181,7 +181,6 @@ function W:set_extmark(symbol_id, line, count, id)
 
   local opts = u.make_extmark_opts(text, self.opts.vt_position, line, self.bufnr, id)
   local ok, new_id = pcall(vim.api.nvim_buf_set_extmark, self.bufnr, ns, line, 0, opts)
-  -- return vim.api.nvim_buf_set_extmark(self.bufnr, ns, line, 0, opts)
   return ok and new_id or nil
 end
 
