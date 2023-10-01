@@ -13,8 +13,9 @@ local filter_js_vars = {
     local symbol, _, bufnr = data.symbol, data.parent, data.bufnr
     if is_ts(bufnr) then
       local pos = { symbol.range.start.line, symbol.range.start.character }
-      local node = vim.treesitter.get_node({ bufrn = bufnr, pos = pos })
-      if node and node:type() == 'identifier' and node:parent():type() == 'variable_declarator' then
+      -- Treesitter may still lose buffer context
+      local ok, node = pcall(vim.treesitter.get_node, { bufrn = bufnr, pos = pos })
+      if (ok and node) and node:type() == 'identifier' and node:parent():type() == 'variable_declarator' then
         local value = node:parent():field('value')[1]
         return vim.tbl_contains({ 'arrow_function', 'function' }, value and value:type() or '')
       end
