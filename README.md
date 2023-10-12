@@ -146,6 +146,8 @@ SymbolKind = {
 
 ### Bubbles
 
+<img width="534" alt="Снимок экрана 2023-10-13 в 02 08 52" src="https://github.com/Wansmer/symbol-usage.nvim/assets/46977173/3d5860a9-8dc7-44ce-a373-5baab1761ab2">
+
 <details>
 
 <summary>Implementation</summary>
