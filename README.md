@@ -73,6 +73,8 @@ local default_opts = {
   ---vt_position to avoid "jumping lines".
   ---@type string|table|false
   request_pending_text = 'loading...',
+  ---The function can return a string to which the highlighting group from `opts.hl` is applied.
+  ---Alternatively, it can return a table of tuples of the form `{ { { text, hl_group }, ... }`` - in this case the specified groups will be applied.
   ---@type function(symbol: Symbol): string|table Symbol{ definition = integer|nil, implementation = integer|nil, references = integer|nil }
   text_format = function(symbol)
     local fragments = {}
@@ -140,6 +142,71 @@ SymbolKind = {
 
 </details>
 
+## Format text examples
+
+### Bubbles
+
+<details>
+
+<summary>Implementation</summary>
+
+```lua
+local function h(name) return vim.api.nvim_get_hl(0, { name = name }) end
+
+-- hl-groups can have any name
+vim.api.nvim_set_hl(0, 'SymbolUsageRounding', { fg = h('CursorLine').bg, italic = true })
+vim.api.nvim_set_hl(0, 'SymbolUsageContent', { bg = h('CursorLine').bg, fg = h('Comment').fg, italic = true })
+vim.api.nvim_set_hl(0, 'SymbolUsageRef', { fg = h('Function').fg, bg = h('CursorLine').bg, italic = true })
+vim.api.nvim_set_hl(0, 'SymbolUsageDef', { fg = h('Type').fg, bg = h('CursorLine').bg, italic = true })
+vim.api.nvim_set_hl(0, 'SymbolUsageImpl', { fg = h('@keyword').fg, bg = h('CursorLine').bg, italic = true })
+
+local round_start = { '', 'SymbolUsageRounding' }
+local round_end = { '', 'SymbolUsageRounding' }
+
+local function text_format(symbol)
+  local res = {}
+
+  if symbol.references then
+    symbol.references = symbol.references > 0 and symbol.references - 1 or symbol.references
+    local usage = symbol.references <= 1 and 'usage' or 'usages'
+    local num = symbol.references == 0 and 'no' or symbol.references
+    table.insert(res, round_start)
+    table.insert(res, { '󰌹 ', 'SymbolUsageRef' })
+    table.insert(res, { ('%s %s'):format(num, usage), 'SymbolUsageContent' })
+    table.insert(res, round_end)
+  end
+
+  if symbol.definition then
+    if #res > 0 then
+      table.insert(res, { ' ', 'NonText' })
+    end
+    table.insert(res, round_start)
+    table.insert(res, { '󰳽 ', 'SymbolUsageDef' })
+    table.insert(res, { symbol.definition .. ' defs', 'SymbolUsageContent' })
+    table.insert(res, round_end)
+  end
+
+  if symbol.implementation then
+    if #res > 0 then
+      table.insert(res, { ' ', 'NonText' })
+    end
+    table.insert(res, round_start)
+    table.insert(res, { '󰡱 ', 'SymbolUsageImpl' })
+    table.insert(res, { symbol.implementation .. ' impls', 'SymbolUsageContent' })
+    table.insert(res, round_end)
+  end
+
+  return res
+end
+
+require('symbol-usage').setup({
+  request_pending_text = { round_start, { ' loading...', 'SymbolUsageContent' }, round_end },
+  text_format = text_format,
+})
+```
+
+</details>
+
 ## Filtering kinds
 
 Each LSP server processes requests and returns results differently. Therefore, it is impossible to set general settings that are completely suitable for every programming language.
@@ -176,7 +243,7 @@ require('symbol-usage').refresh()
 ## TODO
 
 - [x] Custom filter for symbol kinds;
-- [ ] Different highlighting groups for references, definitions, and implementations;
+- [x] Different highlighting groups for references, definitions, and implementations;
 - [ ] Different symbol kinds for references, definitions, and implementations;
 - [ ] First, query the data for the symbols that are currently on the screen;
 - [ ] Option to show only on current line;
