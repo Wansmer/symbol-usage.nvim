@@ -71,9 +71,9 @@ local default_opts = {
   ---Text to display when request is pending. If `false`, extmark will not be
   ---created until the request is finished. Recommended to use with `above`
   ---vt_position to avoid "jumping lines".
-  ---@type string|false
+  ---@type string|table|false
   request_pending_text = 'loading...',
-  ---@type function(symbol: Symbol): string Symbol{ definition = integer|nil, implementation = integer|nil, references = integer|nil }
+  ---@type function(symbol: Symbol): string|table Symbol{ definition = integer|nil, implementation = integer|nil, references = integer|nil }
   text_format = function(symbol)
     local fragments = {}
 

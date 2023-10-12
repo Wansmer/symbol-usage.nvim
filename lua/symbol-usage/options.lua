@@ -11,7 +11,7 @@ local SymbolKind = vim.lsp.protocol.SymbolKind
 ---@class ImplementationOpts
 ---@field enabled boolean
 
----@alias Formater function(symbol: Symbol): string
+---@alias Formater function(symbol: Symbol): string|table
 ---@alias VTPosition 'above'|'end_of_line'|'textwidth'
 ---@alias filterKind function(data: { symbol:table, parent:table, bufnr:integer }): boolean
 
@@ -25,7 +25,7 @@ local SymbolKind = vim.lsp.protocol.SymbolKind
 ---@field definition? DefinitionOpts Opts for definitions
 ---@field implementation? ImplementationOpts Opts for implementations
 ---@field vt_position? VTPosition Virtual text position (`above` by default)
----@field request_pending_text? string|false Text to display when request is pending. If `false`, extmark will not be created until the request is finished. Recommended to use with `above` vt_position to avoid "jumping lines".
+---@field request_pending_text? string|table|false Text to display when request is pending. If `false`, extmark will not be created until the request is finished. Recommended to use with `above` vt_position to avoid "jumping lines".
 ---@field filetypes UserOpts[] To override opts for specific filetypes. Missing field came from common opts
 
 local S = {}
