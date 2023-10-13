@@ -3,12 +3,12 @@
 Plugin to display references, definitions, and implementations of document symbols with a view like JetBrains Idea.
 
 <!--toc:start-->
-
 - [Features](#features)
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Setup](#setup)
-- [Filter kinds](#filtering-kinds)
+- [Format text examples](#format-text-examples)
+- [Filtering kinds](#filtering-kinds)
 - [API](#api)
 - [TODO](#todo)
 - [Other sources with similar feature](#other-sources-with-similar-feature)
@@ -75,26 +75,9 @@ local default_opts = {
   request_pending_text = 'loading...',
   ---The function can return a string to which the highlighting group from `opts.hl` is applied.
   ---Alternatively, it can return a table of tuples of the form `{ { { text, hl_group }, ... }`` - in this case the specified groups will be applied.
+  ---See `#format-text-examples`
   ---@type function(symbol: Symbol): string|table Symbol{ definition = integer|nil, implementation = integer|nil, references = integer|nil }
-  text_format = function(symbol)
-    local fragments = {}
-
-    if symbol.references then
-      local usage = symbol.references <= 1 and 'usage' or 'usages'
-      local num = symbol.references == 0 and 'no' or symbol.references
-      table.insert(fragments, ('%s %s'):format(num, usage))
-    end
-
-    if symbol.definition then
-      table.insert(fragments, symbol.definition .. ' defs')
-    end
-
-    if symbol.implementation then
-      table.insert(fragments, symbol.implementation .. ' impls')
-    end
-
-    return table.concat(fragments, ', ')
-  end,
+  -- text_format = function(symbol) end,
   references = { enabled = true, include_declaration = false },
   definition = { enabled = false },
   implementation = { enabled = false },
