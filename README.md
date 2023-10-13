@@ -3,12 +3,12 @@
 Plugin to display references, definitions, and implementations of document symbols with a view like JetBrains Idea.
 
 <!--toc:start-->
-
 - [Features](#features)
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Setup](#setup)
-- [Filter kinds](#filtering-kinds)
+- [Format text examples](#format-text-examples)
+- [Filtering kinds](#filtering-kinds)
 - [API](#api)
 - [TODO](#todo)
 - [Other sources with similar feature](#other-sources-with-similar-feature)
@@ -71,28 +71,13 @@ local default_opts = {
   ---Text to display when request is pending. If `false`, extmark will not be
   ---created until the request is finished. Recommended to use with `above`
   ---vt_position to avoid "jumping lines".
-  ---@type string|false
+  ---@type string|table|false
   request_pending_text = 'loading...',
-  ---@type function(symbol: Symbol): string Symbol{ definition = integer|nil, implementation = integer|nil, references = integer|nil }
-  text_format = function(symbol)
-    local fragments = {}
-
-    if symbol.references then
-      local usage = symbol.references <= 1 and 'usage' or 'usages'
-      local num = symbol.references == 0 and 'no' or symbol.references
-      table.insert(fragments, ('%s %s'):format(num, usage))
-    end
-
-    if symbol.definition then
-      table.insert(fragments, symbol.definition .. ' defs')
-    end
-
-    if symbol.implementation then
-      table.insert(fragments, symbol.implementation .. ' impls')
-    end
-
-    return table.concat(fragments, ', ')
-  end,
+  ---The function can return a string to which the highlighting group from `opts.hl` is applied.
+  ---Alternatively, it can return a table of tuples of the form `{ { text, hl_group }, ... }`` - in this case the specified groups will be applied.
+  ---See `#format-text-examples`
+  ---@type function(symbol: Symbol): string|table Symbol{ definition = integer|nil, implementation = integer|nil, references = integer|nil }
+  -- text_format = function(symbol) end,
   references = { enabled = true, include_declaration = false },
   definition = { enabled = false },
   implementation = { enabled = false },
@@ -140,6 +125,166 @@ SymbolKind = {
 
 </details>
 
+## Format text examples
+
+### Plain text
+
+<img width="535" alt="Снимок экрана 2023-10-13 в 02 57 45" src="https://github.com/Wansmer/symbol-usage.nvim/assets/46977173/230520c5-5ab2-4192-b31e-d7b9024b8733">
+
+<details>
+
+<summary>Implementation</summary>
+
+```lua
+local function text_format(symbol)
+  local fragments = {}
+  
+  if symbol.references then
+    local usage = symbol.references <= 1 and 'usage' or 'usages'
+    local num = symbol.references == 0 and 'no' or symbol.references
+    table.insert(fragments, ('%s %s'):format(num, usage))
+  end
+  
+  if symbol.definition then
+    table.insert(fragments, symbol.definition .. ' defs')
+  end
+  
+  if symbol.implementation then
+    table.insert(fragments, symbol.implementation .. ' impls')
+  end
+  
+  return table.concat(fragments, ', ')
+end
+
+require('symbol-usage').setup({
+  text_format = text_format,
+})
+```
+
+</details>
+
+### Bubbles
+
+<img width="534" alt="Снимок экрана 2023-10-13 в 02 08 52" src="https://github.com/Wansmer/symbol-usage.nvim/assets/46977173/3d5860a9-8dc7-44ce-a373-5baab1761ab2">
+
+<details>
+
+<summary>Implementation</summary>
+
+```lua
+local function h(name) return vim.api.nvim_get_hl(0, { name = name }) end
+
+-- hl-groups can have any name
+vim.api.nvim_set_hl(0, 'SymbolUsageRounding', { fg = h('CursorLine').bg, italic = true })
+vim.api.nvim_set_hl(0, 'SymbolUsageContent', { bg = h('CursorLine').bg, fg = h('Comment').fg, italic = true })
+vim.api.nvim_set_hl(0, 'SymbolUsageRef', { fg = h('Function').fg, bg = h('CursorLine').bg, italic = true })
+vim.api.nvim_set_hl(0, 'SymbolUsageDef', { fg = h('Type').fg, bg = h('CursorLine').bg, italic = true })
+vim.api.nvim_set_hl(0, 'SymbolUsageImpl', { fg = h('@keyword').fg, bg = h('CursorLine').bg, italic = true })
+
+local round_start = { '', 'SymbolUsageRounding' }
+local round_end = { '', 'SymbolUsageRounding' }
+
+local function text_format(symbol)
+  local res = {}
+
+  if symbol.references then
+    symbol.references = symbol.references > 0 and symbol.references - 1 or symbol.references
+    local usage = symbol.references <= 1 and 'usage' or 'usages'
+    local num = symbol.references == 0 and 'no' or symbol.references
+    table.insert(res, round_start)
+    table.insert(res, { '󰌹 ', 'SymbolUsageRef' })
+    table.insert(res, { ('%s %s'):format(num, usage), 'SymbolUsageContent' })
+    table.insert(res, round_end)
+  end
+
+  if symbol.definition then
+    if #res > 0 then
+      table.insert(res, { ' ', 'NonText' })
+    end
+    table.insert(res, round_start)
+    table.insert(res, { '󰳽 ', 'SymbolUsageDef' })
+    table.insert(res, { symbol.definition .. ' defs', 'SymbolUsageContent' })
+    table.insert(res, round_end)
+  end
+
+  if symbol.implementation then
+    if #res > 0 then
+      table.insert(res, { ' ', 'NonText' })
+    end
+    table.insert(res, round_start)
+    table.insert(res, { '󰡱 ', 'SymbolUsageImpl' })
+    table.insert(res, { symbol.implementation .. ' impls', 'SymbolUsageContent' })
+    table.insert(res, round_end)
+  end
+
+  return res
+end
+
+require('symbol-usage').setup({
+  request_pending_text = { round_start, { ' loading...', 'SymbolUsageContent' }, round_end },
+  text_format = text_format,
+})
+```
+
+</details>
+
+### Labels
+
+<img width="528" alt="Снимок экрана 2023-10-13 в 02 52 00" src="https://github.com/Wansmer/symbol-usage.nvim/assets/46977173/cdc11cca-fc99-4cfb-a1f7-9ae4d1aaf8e8">
+
+<details>
+
+<summary>Implementation</summary>
+
+```lua
+local function h(name) return vim.api.nvim_get_hl(0, { name = name }) end
+
+vim.api.nvim_set_hl(0, 'SymbolUsageRef', { bg = h('Type').fg, fg = h('Normal').bg, bold = true })
+vim.api.nvim_set_hl(0, 'SymbolUsageRefRound', { fg = h('Type').fg })
+
+vim.api.nvim_set_hl(0, 'SymbolUsageDef', { bg = h('Function').fg, fg = h('Normal').bg, bold = true })
+vim.api.nvim_set_hl(0, 'SymbolUsageDefRound', { fg = h('Function').fg })
+
+vim.api.nvim_set_hl(0, 'SymbolUsageImpl', { bg = h('@parameter').fg, fg = h('Normal').bg, bold = true })
+vim.api.nvim_set_hl(0, 'SymbolUsageImplRound', { fg = h('@parameter').fg })
+
+local function text_format(symbol)
+  local res = {}
+
+  if symbol.references then
+    table.insert(res, { '󰍞', 'SymbolUsageRefRound' })
+    table.insert(res, { '󰌹 ' .. tostring(symbol.references), 'SymbolUsageRef' })
+    table.insert(res, { '󰍟', 'SymbolUsageRefRound' })
+  end
+
+  if symbol.definition then
+    if #res > 0 then
+      table.insert(res, { ' ', 'NonText' })
+    end
+    table.insert(res, { '󰍞', 'SymbolUsageDefRound' })
+    table.insert(res, { '󰳽 ' .. tostring(symbol.definition), 'SymbolUsageDef' })
+    table.insert(res, { '󰍟', 'SymbolUsageDefRound' })
+  end
+
+  if symbol.implementation then
+    if #res > 0 then
+      table.insert(res, { ' ', 'NonText' })
+    end
+    table.insert(res, { '󰍞', 'SymbolUsageImplRound' })
+    table.insert(res, { '󰡱 ' .. tostring(symbol.implementation), 'SymbolUsageImpl' })
+    table.insert(res, { '󰍟', 'SymbolUsageImplRound' })
+  end
+
+  return res
+end
+
+require('symbol-usage').setup({
+  text_format = text_format,
+})
+```
+
+</details>
+
 ## Filtering kinds
 
 Each LSP server processes requests and returns results differently. Therefore, it is impossible to set general settings that are completely suitable for every programming language.
@@ -176,7 +321,7 @@ require('symbol-usage').refresh()
 ## TODO
 
 - [x] Custom filter for symbol kinds;
-- [ ] Different highlighting groups for references, definitions, and implementations;
+- [x] Different highlighting groups for references, definitions, and implementations;
 - [ ] Different symbol kinds for references, definitions, and implementations;
 - [ ] First, query the data for the symbols that are currently on the screen;
 - [ ] Option to show only on current line;

@@ -97,22 +97,36 @@ function M.get_position(symbol)
   return position and position[place]
 end
 
+---Return length of all virtual text
+---@param vt table
+---@return integer
+local function get_vt_length(vt)
+  local res = 0
+  for _, val in ipairs(vt) do
+    -- Need 'strdisplaywidth' for correct counts icon length
+    res = res + vim.fn.strdisplaywidth(val[1])
+  end
+  return res
+end
+
 ---Make opts for extmark according opts.vt_position
----@param text string Virtual text
+---@param text string|table Virtual text
 ---@param pos VTPosition
 ---@param line integer 0-index line number
 ---@param bufnr integer Buffer id
 ---@param id integer|nil Extmark id
 ---@return table Opts for |nvim_buf_set_extmark()|
 function M.make_extmark_opts(text, pos, line, bufnr, id)
-  local vtext = { { text, 'SymbolUsageText' } }
+  local is_tbl = type(text) == 'table'
+  local vtext = is_tbl and text or { { text, 'SymbolUsageText' } }
 
   local modes = {
     end_of_line = function()
       return { virt_text_pos = 'eol', virt_text = vtext }
     end,
     textwidth = function()
-      return { virt_text = vtext, virt_text_win_col = tonumber(vim.bo[bufnr].textwidth) - (#text + 1) }
+      local shift = not is_tbl and #text or get_vt_length(vtext)
+      return { virt_text = vtext, virt_text_win_col = tonumber(vim.bo[bufnr].textwidth) - (shift + 1) }
     end,
     above = function()
       -- |vim.fn.indent()| is not convenient because it can't be specified for a specific buffer.
@@ -122,7 +136,7 @@ function M.make_extmark_opts(text, pos, line, bufnr, id)
       if ok then
         indent = l[1]:match('^(%s*)')
       end
-      vtext[1][1] = indent .. text
+      vtext[1][1] = indent .. (is_tbl and text[1][1] or text)
       return { virt_lines = { vtext }, virt_lines_above = true }
     end,
   }
