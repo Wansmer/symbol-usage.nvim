@@ -146,7 +146,7 @@ SymbolKind = {
 
 ### Plain text
 
-<img width="534" alt="Снимок экрана 2023-10-13 в 02 08 52" src="https://github.com/Wansmer/symbol-usage.nvim/assets/46977173/3d5860a9-8dc7-44ce-a373-5baab1761ab2">
+<img width="535" alt="Снимок экрана 2023-10-13 в 02 57 45" src="https://github.com/Wansmer/symbol-usage.nvim/assets/46977173/230520c5-5ab2-4192-b31e-d7b9024b8733">
 
 <details>
 
@@ -177,6 +177,8 @@ require('symbol-usage').setup({
   text_format = text_format,
 })
 ```
+
+</details>
 
 ### Bubbles
 
@@ -241,9 +243,11 @@ require('symbol-usage').setup({
 })
 ```
 
+</details>
+
 ### Labels
 
-<img width="534" alt="Снимок экрана 2023-10-13 в 02 08 52" src="https://github.com/Wansmer/symbol-usage.nvim/assets/46977173/3d5860a9-8dc7-44ce-a373-5baab1761ab2">
+<img width="528" alt="Снимок экрана 2023-10-13 в 02 52 00" src="https://github.com/Wansmer/symbol-usage.nvim/assets/46977173/cdc11cca-fc99-4cfb-a1f7-9ae4d1aaf8e8">
 
 <details>
 
