@@ -181,14 +181,13 @@ vim.api.nvim_set_hl(0, 'SymbolUsageRef', { fg = h('Function').fg, bg = h('Cursor
 vim.api.nvim_set_hl(0, 'SymbolUsageDef', { fg = h('Type').fg, bg = h('CursorLine').bg, italic = true })
 vim.api.nvim_set_hl(0, 'SymbolUsageImpl', { fg = h('@keyword').fg, bg = h('CursorLine').bg, italic = true })
 
-local round_start = { '', 'SymbolUsageRounding' }
-local round_end = { '', 'SymbolUsageRounding' }
-
 local function text_format(symbol)
   local res = {}
 
+  local round_start = { '', 'SymbolUsageRounding' }
+  local round_end = { '', 'SymbolUsageRounding' }
+
   if symbol.references then
-    symbol.references = symbol.references > 0 and symbol.references - 1 or symbol.references
     local usage = symbol.references <= 1 and 'usage' or 'usages'
     local num = symbol.references == 0 and 'no' or symbol.references
     table.insert(res, round_start)
@@ -221,7 +220,6 @@ local function text_format(symbol)
 end
 
 require('symbol-usage').setup({
-  request_pending_text = { round_start, { ' loading...', 'SymbolUsageContent' }, round_end },
   text_format = text_format,
 })
 ```
