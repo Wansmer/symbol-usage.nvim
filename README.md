@@ -74,7 +74,7 @@ local default_opts = {
   ---@type string|table|false
   request_pending_text = 'loading...',
   ---The function can return a string to which the highlighting group from `opts.hl` is applied.
-  ---Alternatively, it can return a table of tuples of the form `{ { { text, hl_group }, ... }`` - in this case the specified groups will be applied.
+  ---Alternatively, it can return a table of tuples of the form `{ { text, hl_group }, ... }`` - in this case the specified groups will be applied.
   ---See `#format-text-examples`
   ---@type function(symbol: Symbol): string|table Symbol{ definition = integer|nil, implementation = integer|nil, references = integer|nil }
   -- text_format = function(symbol) end,
