@@ -47,6 +47,17 @@ local javascript = {
         end
         return true
       end,
+      function(data)
+        if is_ts(data.bufnr) then
+          local pos = { data.symbol.range.start.line, data.symbol.range.start.character }
+          local ok, node = pcall(vim.treesitter.get_node, { bufrn = data.bufnr, pos = pos })
+          if (ok and node) and node:parent():type() == 'arguments' then
+            return false
+          end
+        else
+          return true
+        end
+      end,
     },
   },
 }
