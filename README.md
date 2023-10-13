@@ -144,6 +144,40 @@ SymbolKind = {
 
 ## Format text examples
 
+### Plain text
+
+<img width="534" alt="Снимок экрана 2023-10-13 в 02 08 52" src="https://github.com/Wansmer/symbol-usage.nvim/assets/46977173/3d5860a9-8dc7-44ce-a373-5baab1761ab2">
+
+<details>
+
+<summary>Implementation</summary>
+
+```lua
+local function text_format(symbol)
+  local fragments = {}
+  
+  if symbol.references then
+    local usage = symbol.references <= 1 and 'usage' or 'usages'
+    local num = symbol.references == 0 and 'no' or symbol.references
+    table.insert(fragments, ('%s %s'):format(num, usage))
+  end
+  
+  if symbol.definition then
+    table.insert(fragments, symbol.definition .. ' defs')
+  end
+  
+  if symbol.implementation then
+    table.insert(fragments, symbol.implementation .. ' impls')
+  end
+  
+  return table.concat(fragments, ', ')
+end
+
+require('symbol-usage').setup({
+  text_format = text_format,
+})
+```
+
 ### Bubbles
 
 <img width="534" alt="Снимок экрана 2023-10-13 в 02 08 52" src="https://github.com/Wansmer/symbol-usage.nvim/assets/46977173/3d5860a9-8dc7-44ce-a373-5baab1761ab2">
@@ -203,6 +237,61 @@ end
 
 require('symbol-usage').setup({
   request_pending_text = { round_start, { ' loading...', 'SymbolUsageContent' }, round_end },
+  text_format = text_format,
+})
+```
+
+### Labels
+
+<img width="534" alt="Снимок экрана 2023-10-13 в 02 08 52" src="https://github.com/Wansmer/symbol-usage.nvim/assets/46977173/3d5860a9-8dc7-44ce-a373-5baab1761ab2">
+
+<details>
+
+<summary>Implementation</summary>
+
+```lua
+local function h(name) return vim.api.nvim_get_hl(0, { name = name }) end
+
+vim.api.nvim_set_hl(0, 'SymbolUsageRef', { bg = h('Type').fg, fg = h('Normal').bg, bold = true })
+vim.api.nvim_set_hl(0, 'SymbolUsageRefRound', { fg = h('Type').fg })
+
+vim.api.nvim_set_hl(0, 'SymbolUsageDef', { bg = h('Function').fg, fg = h('Normal').bg, bold = true })
+vim.api.nvim_set_hl(0, 'SymbolUsageDefRound', { fg = h('Function').fg })
+
+vim.api.nvim_set_hl(0, 'SymbolUsageImpl', { bg = h('@parameter').fg, fg = h('Normal').bg, bold = true })
+vim.api.nvim_set_hl(0, 'SymbolUsageImplRound', { fg = h('@parameter').fg })
+
+local function text_format(symbol)
+  local res = {}
+
+  if symbol.references then
+    table.insert(res, { '󰍞', 'SymbolUsageRefRound' })
+    table.insert(res, { '󰌹 ' .. tostring(symbol.references), 'SymbolUsageRef' })
+    table.insert(res, { '󰍟', 'SymbolUsageRefRound' })
+  end
+
+  if symbol.definition then
+    if #res > 0 then
+      table.insert(res, { ' ', 'NonText' })
+    end
+    table.insert(res, { '󰍞', 'SymbolUsageDefRound' })
+    table.insert(res, { '󰳽 ' .. tostring(symbol.definition), 'SymbolUsageDef' })
+    table.insert(res, { '󰍟', 'SymbolUsageDefRound' })
+  end
+
+  if symbol.implementation then
+    if #res > 0 then
+      table.insert(res, { ' ', 'NonText' })
+    end
+    table.insert(res, { '󰍞', 'SymbolUsageImplRound' })
+    table.insert(res, { '󰡱 ' .. tostring(symbol.implementation), 'SymbolUsageImpl' })
+    table.insert(res, { '󰍟', 'SymbolUsageImplRound' })
+  end
+
+  return res
+end
+
+require('symbol-usage').setup({
   text_format = text_format,
 })
 ```
