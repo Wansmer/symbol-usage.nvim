@@ -81,12 +81,14 @@ end
 ---is returned.
 ---Explanation: Different clients return symbol data with different structures.
 ---@param symbol table Item from 'textDocument/documentSymbol' response
+---@param opts? UserOpts Lang opts
 ---@return table?
-function M.get_position(symbol)
+function M.get_position(symbol, opts)
+  opts = opts or {}
   -- First search 'selectionRange' because it gives range to name the symbol
   local position = M.get_nested_key_value(symbol, 'selectionRange')
   -- If 'selectionRange' is found, use last character of name as point to send request
-  local place = 'end'
+  local place = opts.symbol_request_pos or 'end'
   if not position then
     -- If 'selectionRange' does not exist, search 'range' (range includes whole body of symbol)
     position = M.get_nested_key_value(symbol, 'range')

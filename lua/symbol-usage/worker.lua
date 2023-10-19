@@ -127,7 +127,7 @@ end
 function W:traversal(symbol_tree)
   local function _walk(data, parent, actual)
     for _, symbol in ipairs(data) do
-      local pos = u.get_position(symbol)
+      local pos = u.get_position(symbol, self.opts)
       -- If not `pos`, the following actions are useless
       if pos then
         local symbol_id = table.concat({
@@ -233,7 +233,7 @@ end
 ---@param method Method Method name without 'textDocument/', e.g. 'references'|'definition'|'implementation'
 ---@return table? returns nil if symbol have not 'selectionRange' or 'range' field
 function W:make_params(symbol, method)
-  local position = u.get_position(symbol)
+  local position = u.get_position(symbol, self.opts)
   if not position then
     return
   end
