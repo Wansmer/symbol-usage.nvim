@@ -26,6 +26,7 @@ local SymbolKind = vim.lsp.protocol.SymbolKind
 ---@field implementation? ImplementationOpts Opts for implementations
 ---@field vt_position? VTPosition Virtual text position (`above` by default)
 ---@field request_pending_text? string|table|false Text to display when request is pending. If `false`, extmark will not be created until the request is finished. Recommended to use with `above` vt_position to avoid "jumping lines".
+---@field symbol_request_pos? 'start'|'end' Position to detect symbol to start request `textDocument/references|textDocument/definition|textDocument/implementation`. See #
 ---@field filetypes UserOpts[] To override opts for specific filetypes. Missing field came from common opts
 
 local S = {}
