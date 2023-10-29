@@ -23,7 +23,7 @@ local filter_js_vars = {
     else
       -- Fallback to check if treesitter is not attached
       local ln = symbol.range.start.line
-      local text = vim.api.nvim_buf_get_lines(bufnr, ln, ln + 1, true)[1]
+      local text = vim.api.nvim_buf_get_lines(bufnr, ln, ln + 1, true)[1] or ''
       return text:find('function') or text:find('=>')
     end
   end,
