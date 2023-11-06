@@ -37,6 +37,11 @@ end
 ---Run worker for buffer
 ---@param check_version? boolean|nil
 function W:run(check_version)
+  local ft = vim.bo[self.bufnr].filetype
+  if vim.tbl_contains(self.opts.disable.lsp, self.client.name) or vim.tbl_contains(self.opts.disable.filetypes, ft) then
+    return
+  end
+
   if check_version then
     -- Run only if buffer was changed
     if self.buf_version ~= vim.lsp.util.buf_versions[self.bufnr] then
