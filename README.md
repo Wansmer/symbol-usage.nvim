@@ -56,7 +56,7 @@ Default options values:
 local SymbolKind = vim.lsp.protocol.SymbolKind
 
 ---@type UserOpts
-local default_opts = {
+require('symbol-usage').setup({
   ---@type table<string, any> `nvim_set_hl`-like options for highlight virtual text
   hl = { link = 'Comment' },
   ---@type lsp.SymbolKind[] Symbol kinds what need to be count (see `lsp.SymbolKind`)
@@ -82,11 +82,13 @@ local default_opts = {
   references = { enabled = true, include_declaration = false },
   definition = { enabled = false },
   implementation = { enabled = false },
+  ---@type { lsp?: string[], filetypes?: string[] } Disables `symbol-usage.nvim' on certain LSPs or file types.
+  disable = { lsp = {}, filetypes = {} },
   ---@type UserOpts[] See default overridings in `lua/symbol-usage/langs.lua`
   -- filetypes = {},
   ---@type 'start'|'end' At which position of `symbol.selectionRange` the request to the lsp server should start. Default is `end` (try changing it to `start` if the symbol counting is not correct).
   symbol_request_pos = 'end', -- Recommended redifine only in `filetypes` override table
-}
+})
 ```
 
 <details>
