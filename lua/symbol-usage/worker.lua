@@ -139,6 +139,7 @@ function W:traversal(symbol_tree)
           parent and parent.name or '',
           symbol.kind,
           symbol.name,
+          symbol.detail and symbol.detail or '',
         })
 
         for _, method in ipairs({ 'references', 'definition', 'implementation' }) do
