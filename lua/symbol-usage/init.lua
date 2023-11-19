@@ -34,6 +34,18 @@ function M.toggle()
   end
 end
 
+function M.toggle_globally()
+  state.active = not state.active
+  for bufnr, _ in pairs(state.buffers) do
+    if state.active then
+      buf.attach_buffer(bufnr)
+    else
+      vim.api.nvim_buf_clear_namespace(bufnr, u.NS, 0, -1)
+    end
+  end
+  return state.active
+end
+
 function M.refresh()
   local bufnr = vim.api.nvim_get_current_buf()
   buf.clear_buffer(bufnr)
