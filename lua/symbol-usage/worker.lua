@@ -1,5 +1,6 @@
 local u = require('symbol-usage.utils')
 local o = require('symbol-usage.options')
+local state = require('symbol-usage.state')
 
 local ns = u.NS
 
@@ -38,7 +39,11 @@ end
 ---@param check_version? boolean|nil
 function W:run(check_version)
   local ft = vim.bo[self.bufnr].filetype
-  if vim.tbl_contains(self.opts.disable.lsp, self.client.name) or vim.tbl_contains(self.opts.disable.filetypes, ft) then
+  local no_run = vim.tbl_contains(self.opts.disable.lsp, self.client.name)
+    or vim.tbl_contains(self.opts.disable.filetypes, ft)
+    or not state.active
+
+  if no_run then
     return
   end
 

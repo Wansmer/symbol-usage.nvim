@@ -315,6 +315,15 @@ Toggle virtual text for current buffer:
 require('symbol-usage').toggle()
 ```
 
+Toggle virtual text for all buffers:
+
+> After re-enabling, the virtual text will appear after `BufEnter`
+
+```lua
+---@return boolean True if active, false otherwise
+require('symbol-usage').toggle_globally()
+```
+
 Refresh current buffer:
 
 ```lua
