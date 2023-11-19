@@ -27,7 +27,7 @@ end
 
 function M.toggle()
   local bufnr = vim.api.nvim_get_current_buf()
-  if state.get(bufnr) then
+  if state.get_buf_workers(bufnr) then
     buf.clear_buffer(bufnr)
   else
     buf.attach_buffer(bufnr)

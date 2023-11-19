@@ -27,7 +27,7 @@ end
 ---Get workers for buffer
 ---@param buf integer Buffer id
 ---@return Worker[]
-function state.get(buf)
+function state.get_buf_workers(buf)
   return state[buf]
 end
 

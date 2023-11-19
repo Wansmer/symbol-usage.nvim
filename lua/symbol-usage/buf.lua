@@ -13,7 +13,7 @@ function M.set_buf_autocmd(bufnr)
       group = u.NESTED_GROUP,
       nested = true,
       callback = function(e)
-        for _, wkr in pairs(state.get(e.buf)) do
+        for _, wkr in pairs(state.get_buf_workers(e.buf)) do
           wkr:run(check_version)
         end
       end,
@@ -28,7 +28,7 @@ function M.set_buf_autocmd(bufnr)
     local o = opts(true)
     o.callback = function(e)
       if e.data.method == 'textDocument/didOpen' then
-        for _, wkr in pairs(state.get(e.buf)) do
+        for _, wkr in pairs(state.get_buf_workers(e.buf)) do
           wkr:run(true)
         end
       end
