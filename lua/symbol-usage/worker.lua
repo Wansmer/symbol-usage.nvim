@@ -180,6 +180,12 @@ end
 ---@param id integer|nil
 ---@return integer? Extmark id
 function W:set_extmark(symbol_id, line, count, id)
+  -- The buffer can already be removed from the state when the woker finishes. See issue #32
+  -- Prevent drawing already unneeded extmarks
+  if next(state.get_buf_workers(self.bufnr)) == nil then
+    return
+  end
+
   local text = self.opts.request_pending_text
   if self.symbols[symbol_id] and count then
     count = vim.tbl_deep_extend('force', self.symbols[symbol_id], count)
