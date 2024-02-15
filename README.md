@@ -82,8 +82,9 @@ require('symbol-usage').setup({
   references = { enabled = true, include_declaration = false },
   definition = { enabled = false },
   implementation = { enabled = false },
-  ---@type { lsp?: string[], filetypes?: string[] } Disables `symbol-usage.nvim' on certain LSPs or file types.
-  disable = { lsp = {}, filetypes = {} },
+  ---@type { lsp?: string[], filetypes?: string[], cond?: function[] } Disables `symbol-usage.nvim' for specific LSPs, filetypes, or on custom conditions.
+  ---The function in the `cond` list takes an argument `bufnr` and returns a boolean. If it returns true, `symbol-usage` will not run in that buffer.
+  disable = { lsp = {}, filetypes = {}, cond = {} },
   ---@type UserOpts[] See default overridings in `lua/symbol-usage/langs.lua`
   -- filetypes = {},
   ---@type 'start'|'end' At which position of `symbol.selectionRange` the request to the lsp server should start. Default is `end` (try changing it to `start` if the symbol counting is not correct).
