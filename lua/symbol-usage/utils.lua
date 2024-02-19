@@ -135,7 +135,7 @@ function M.make_extmark_opts(text, pos, line, bufnr, id)
       -- Buffer can be another if this function is called
       local ok, l = pcall(vim.api.nvim_buf_get_lines, bufnr, line, line + 1, true)
       local indent = ''
-      if ok then
+      if ok and l and not vim.tbl_isempty(l) then
         indent = l[1]:match('^(%s*)')
       end
       vtext[1][1] = indent .. (is_tbl and text[1][1] or text)
