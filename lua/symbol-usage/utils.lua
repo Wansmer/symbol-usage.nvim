@@ -126,6 +126,11 @@ function M.make_extmark_opts(text, pos, line, bufnr, id)
     end_of_line = function()
       return { virt_text_pos = 'eol', virt_text = vtext }
     end,
+    signcolumn = function()
+      local sign = vim.fn.strcharpart(vtext[1][1], 0, 2)
+      local hl = vtext[1][2]
+      return { sign_text = sign, sign_hl_group = hl }
+    end,
     textwidth = function()
       local shift = not is_tbl and #text or get_vt_length(vtext)
       return { virt_text = vtext, virt_text_win_col = tonumber(vim.bo[bufnr].textwidth) - (shift + 1) }

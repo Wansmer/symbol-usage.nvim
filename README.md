@@ -67,7 +67,7 @@ require('symbol-usage').setup({
   ---See: #filter-kinds
   ---@type table<lsp.SymbolKind, filterKind[]>
   kinds_filter = {},
-  ---@type 'above'|'end_of_line'|'textwidth' above by default
+  ---@type 'above'|'end_of_line'|'textwidth'|'signcolumn' `above` by default
   vt_position = 'above',
   ---Text to display when request is pending. If `false`, extmark will not be
   ---created until the request is finished. Recommended to use with `above`
@@ -76,6 +76,7 @@ require('symbol-usage').setup({
   request_pending_text = 'loading...',
   ---The function can return a string to which the highlighting group from `opts.hl` is applied.
   ---Alternatively, it can return a table of tuples of the form `{ { text, hl_group }, ... }`` - in this case the specified groups will be applied.
+  ---If `vt_position` is 'signcolumn', then only a 1-2 length string or a `{{ icon, hl_group }}` table is expected.
   ---See `#format-text-examples`
   ---@type function(symbol: Symbol): string|table Symbol{ definition = integer|nil, implementation = integer|nil, references = integer|nil }
   -- text_format = function(symbol) end,

@@ -11,16 +11,17 @@ local SymbolKind = vim.lsp.protocol.SymbolKind
 ---@class ImplementationOpts
 ---@field enabled boolean
 
----@alias Formater function(symbol: Symbol): string|table
----@alias VTPosition 'above'|'end_of_line'|'textwidth'
----@alias filterKind function(data: { symbol:table, parent:table, bufnr:integer }): boolean
+---@alias VirtualHlText string|table<number, { text: string, hl_group: string }}>
 
+---@alias Formater function(symbol: Symbol): VirtualHlText
+---@alias VTPosition 'above'|'end_of_line'|'textwidth'|'signcolumn'
+---@alias filterKind function(data: { symbol:table, parent:table, bufnr:integer }): boolean
 ---User options to `symbol-usage.nvim`
 ---@class UserOpts
 ---@field hl? table<string, any> `nvim_set_hl`-like options for highlight virtual text
 ---@field kinds? lsp.SymbolKind[] Symbol kinds what need to be count (see `lsp.SymbolKind`)
 ---@field kinds_filter? table<lsp.SymbolKind, filterKind[]> Additional filter for kinds. Recommended use in the filetypes override table.
----@field text_format? Formater Function to format virtual text
+---@field text_format? Formater Function to format virtual text. Must return string or table with (text, hl_group) pair, e.g. `{ { '1 usage', 'Constant' } }`
 ---@field references? ReferencesOpts Opts for references
 ---@field definition? DefinitionOpts Opts for definitions
 ---@field implementation? ImplementationOpts Opts for implementations
