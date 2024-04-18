@@ -40,13 +40,13 @@ S._default_opts = {
   kinds_filter = {},
   vt_position = 'above',
   request_pending_text = 'loading...',
-  text_format = function(symbol, related_count)
+  text_format = function(symbol)
     local fragments = {}
 
     -- Indicator that shows if there are any other symbols in the same line
     local stacked_functions = (function()
-      if related_count > 0 then
-        return "+" .. ("%s"):format(related_count)
+      if symbol.stacked_count > 0 then
+        return (" | +%s"):format(symbol.stacked_count)
       end
       return ""
     end)()
@@ -54,7 +54,7 @@ S._default_opts = {
     if symbol.references then
       local usage = symbol.references <= 1 and 'usage' or 'usages'
       local num = symbol.references == 0 and 'no' or symbol.references
-      table.insert(fragments, ('%s %s %s'):format(num, usage, stacked_functions))
+      table.insert(fragments, ('%s %s'):format(num, usage))
     end
 
     if symbol.definition then
@@ -65,7 +65,7 @@ S._default_opts = {
       table.insert(fragments, symbol.implementation .. ' impls')
     end
 
-    return table.concat(fragments, ', ')
+    return table.concat(fragments, ', ') .. stacked_functions
   end,
   references = { enabled = true, include_declaration = false },
   definition = { enabled = false },
