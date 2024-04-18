@@ -40,11 +40,11 @@ end
 function W:run(check_version)
   local ft = vim.bo[self.bufnr].filetype
   local no_run = not state.active
-    or vim.tbl_contains(self.opts.disable.lsp, self.client.name)
-    or vim.tbl_contains(self.opts.disable.filetypes, ft)
-    or u.some(self.opts.disable.cond, function(cb)
-      return cb(self.bufnr)
-    end)
+      or vim.tbl_contains(self.opts.disable.lsp, self.client.name)
+      or vim.tbl_contains(self.opts.disable.filetypes, ft)
+      or u.some(self.opts.disable.cond, function(cb)
+        return cb(self.bufnr)
+      end)
 
   if no_run then
     return
