@@ -138,6 +138,8 @@ end
 ---@param symbol_tree table
 ---@return table
 function W:traversal(symbol_tree)
+  local booked_lines = {}
+
   local function _walk(data, parent, actual)
     for _, symbol in ipairs(data) do
       local pos = u.get_position(symbol, self.opts)
@@ -152,15 +154,32 @@ function W:traversal(symbol_tree)
 
         for _, method in ipairs({ 'references', 'definition', 'implementation' }) do
           if self:is_need_count(symbol, method, parent) then
-            -- If symbol is new, add mock
-            if not self.symbols[symbol_id] then
-              self:mock_symbol(symbol_id, pos)
+            if not u.table_contains(booked_lines, symbol.range.start.line) then
+              table.insert(booked_lines, symbol.range.start.line)
+
+              -- If symbol is new, add mock
+              if not self.symbols[symbol_id] then
+                self:mock_symbol(symbol_id, pos)
+              end
+
+              -- Collect actual symbols to remove irrelevant ones afterward
+              actual[symbol_id] = {
+                method = method,
+                symbol_id = symbol_id,
+                symbol = symbol,
+                alive = true,
+                render = true,
+                refers_to_line = symbol.range.start.line
+              }
+
+              -- self:count_method(method, symbol_id, symbol)
+            else
+              actual[symbol_id] = {
+                alive = true,
+                render = false,
+                refers_to_line = symbol.range.start.line
+              }
             end
-
-            -- Collect actual symbols to remove irrelevant ones afterward
-            actual[symbol_id] = true
-
-            self:count_method(method, symbol_id, symbol)
           end
         end
       end
@@ -173,7 +192,32 @@ function W:traversal(symbol_tree)
     return actual
   end
 
-  return _walk(symbol_tree, '', {})
+  return (function()
+    local walk_result = _walk(symbol_tree, '', {})
+
+    local result = {}
+    for key, value in pairs(walk_result) do
+      if value.alive and value.render then
+        local relatedCount = 0
+        for _, otherValue in pairs(walk_result) do
+          if otherValue.alive and not otherValue.render and otherValue.refers_to_line == value.refers_to_line then
+            relatedCount = relatedCount + 1
+          end
+        end
+        value.related_count = relatedCount
+        result[key] = value
+      elseif not value.render and value.alive then
+      else
+        result[key] = value
+      end
+    end
+
+    for _, value in pairs(result) do
+      self:count_method(value.method, value.symbol_id, value.symbol, value.related_count)
+    end
+
+    return result
+  end)()
 end
 
 ---Set or update extmark.
@@ -182,7 +226,7 @@ end
 ---@param count table<Method, integer>|nil
 ---@param id integer|nil
 ---@return integer? Extmark id
-function W:set_extmark(symbol_id, line, count, id)
+function W:set_extmark(symbol_id, line, count, id, related_count)
   -- The buffer can already be removed from the state when the woker finishes. See issue #32
   -- Prevent drawing already unneeded extmarks
   if next(state.get_buf_workers(self.bufnr)) == nil then
@@ -192,7 +236,7 @@ function W:set_extmark(symbol_id, line, count, id)
   local text = self.opts.request_pending_text
   if self.symbols[symbol_id] and count then
     count = vim.tbl_deep_extend('force', self.symbols[symbol_id], count)
-    text = self.opts.text_format(count)
+    text = self.opts.text_format(count, related_count)
   end
 
   if not text then
@@ -207,7 +251,7 @@ end
 ---Count method for symbol
 ---@param method Method
 ---@param symbol_id string
-function W:count_method(method, symbol_id, symbol)
+function W:count_method(method, symbol_id, symbol, related_count)
   if not u.support_method(self.client, method) then
     return
   end
@@ -238,7 +282,7 @@ function W:count_method(method, symbol_id, symbol)
       id = record.mark_id
     end
 
-    id = self:set_extmark(symbol_id, params.position.line, { [method] = count }, id)
+    id = self:set_extmark(symbol_id, params.position.line, { [method] = count }, id, related_count)
     if record and id then
       record.mark_id = id
       record[method] = count

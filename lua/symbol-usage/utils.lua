@@ -4,6 +4,20 @@ M.NS = vim.api.nvim_create_namespace('__symbol__')
 M.GROUP = vim.api.nvim_create_augroup('__symbol__', { clear = true })
 M.NESTED_GROUP = vim.api.nvim_create_augroup('__symbol_nested__', { clear = true })
 
+---Check if a table contains a value
+---@param tbl table
+---@param x any
+---@return boolean
+function M.table_contains(tbl, x)
+  local found = false
+  for _, v in pairs(tbl) do
+    if v == x then
+      found = true
+    end
+  end
+  return found
+end
+
 ---Check if client supports method
 ---@param client lsp.Client
 ---@param method string
