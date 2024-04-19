@@ -41,11 +41,11 @@ end
 function W:run(check_version)
   local ft = vim.bo[self.bufnr].filetype
   local no_run = not state.active
-      or vim.tbl_contains(self.opts.disable.lsp, self.client.name)
-      or vim.tbl_contains(self.opts.disable.filetypes, ft)
-      or u.some(self.opts.disable.cond, function(cb)
-        return cb(self.bufnr)
-      end)
+    or vim.tbl_contains(self.opts.disable.lsp, self.client.name)
+    or vim.tbl_contains(self.opts.disable.filetypes, ft)
+    or u.some(self.opts.disable.cond, function(cb)
+      return cb(self.bufnr)
+    end)
 
   if no_run then
     return
@@ -132,7 +132,7 @@ function W:mock_symbol(symbol_id, pos)
     -- Book a place for a virtual text
     mock = {
       mark_id = self:set_extmark(symbol_id, pos.line),
-      stacked_count = 0
+      stacked_count = 0,
     }
   end
   self.symbols[symbol_id] = mock
@@ -145,7 +145,7 @@ function W:traversal(symbol_tree)
   local booked_lines = {
     references = {},
     definition = {},
-    implementation = {}
+    implementation = {},
   }
 
   local function _walk(data, parent, actual)
@@ -167,7 +167,9 @@ function W:traversal(symbol_tree)
 
               -- If symbol is new, add mock
               if not self.symbols[symbol_id] or not actual[symbol_id] then
-                if not self.symbols[symbol_id] then self:mock_symbol(symbol_id, pos) end
+                if not self.symbols[symbol_id] then
+                  self:mock_symbol(symbol_id, pos)
+                end
 
                 -- Collect actual symbols to remove irrelevant ones afterward
                 actual[symbol_id] = {
@@ -176,7 +178,7 @@ function W:traversal(symbol_tree)
                   symbol = symbol,
                   render = true,
                   line = symbol.range.start.line,
-                  start_character = symbol.range.start.character
+                  start_character = symbol.range.start.character,
                 }
               end
 
@@ -212,7 +214,9 @@ function W:traversal(symbol_tree)
     table.sort(sorted_data, sort_by_start_character)
 
     local walk_result = _walk(sorted_data, '', {})
-    for _, element in pairs(self.symbols) do element.stacked_count = 0 end
+    for _, element in pairs(self.symbols) do
+      element.stacked_count = 0
+    end
 
     local result = {}
     for key, value in pairs(walk_result) do

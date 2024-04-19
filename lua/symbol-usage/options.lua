@@ -46,9 +46,9 @@ S._default_opts = {
     -- Indicator that shows if there are any other symbols in the same line
     local stacked_functions = (function()
       if symbol.stacked_count > 0 then
-        return (" | +%s"):format(symbol.stacked_count)
+        return (' | +%s'):format(symbol.stacked_count)
       end
-      return ""
+      return ''
     end)()
 
     if symbol.references then
