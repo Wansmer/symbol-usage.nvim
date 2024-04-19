@@ -89,7 +89,7 @@ require('symbol-usage').setup({
   ---@type UserOpts[] See default overridings in `lua/symbol-usage/langs.lua`
   -- filetypes = {},
   ---@type 'start'|'end' At which position of `symbol.selectionRange` the request to the lsp server should start. Default is `end` (try changing it to `start` if the symbol counting is not correct).
-  symbol_request_pos = 'end', -- Recommended redifine only in `filetypes` override table
+  symbol_request_pos = 'end', -- Recommended redefine only in `filetypes` override table
 })
 ```
 
@@ -294,7 +294,7 @@ require('symbol-usage').setup({
 
 Each LSP server processes requests and returns results differently. Therefore, it is impossible to set general settings that are completely suitable for every programming language.
 
-For example, in `javascipt` arrow functions are not defined as `SymbolKind.Function`, but as `SymbolKind.Variable` or `SymbolKind.Constant`.
+For example, in `javascript` arrow functions are not defined as `SymbolKind.Function`, but as `SymbolKind.Variable` or `SymbolKind.Constant`.
 
 I would like to know how many times an arrow function is used, but keeping track of all variables is not informative.
 For this purpose, you can define additional filters that will check that the variable contains exactly the function and not some other value.
