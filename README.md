@@ -146,6 +146,11 @@ SymbolKind = {
 local function text_format(symbol)
   local fragments = {}
 
+  -- Indicator that shows if there are any other symbols in the same line
+  local stacked_functions = symbol.stacked_count > 0
+      and (' | +%s'):format(symbol.stacked_count)
+      or ''
+
   if symbol.references then
     local usage = symbol.references <= 1 and 'usage' or 'usages'
     local num = symbol.references == 0 and 'no' or symbol.references
@@ -160,7 +165,7 @@ local function text_format(symbol)
     table.insert(fragments, symbol.implementation .. ' impls')
   end
 
-  return table.concat(fragments, ', ')
+  return table.concat(fragments, ', ') .. stacked_functions
 end
 
 require('symbol-usage').setup({
@@ -194,6 +199,11 @@ local function text_format(symbol)
   local round_start = { '', 'SymbolUsageRounding' }
   local round_end = { '', 'SymbolUsageRounding' }
 
+  -- Indicator that shows if there are any other symbols in the same line
+  local stacked_functions_content = symbol.stacked_count > 0
+      and ("+%s"):format(symbol.stacked_count)
+      or ''
+
   if symbol.references then
     local usage = symbol.references <= 1 and 'usage' or 'usages'
     local num = symbol.references == 0 and 'no' or symbol.references
@@ -220,6 +230,16 @@ local function text_format(symbol)
     table.insert(res, round_start)
     table.insert(res, { '󰡱 ', 'SymbolUsageImpl' })
     table.insert(res, { symbol.implementation .. ' impls', 'SymbolUsageContent' })
+    table.insert(res, round_end)
+  end
+
+  if stacked_functions_content ~= '' then
+    if #res > 0 then
+      table.insert(res, { ' ', 'NonText' })
+    end
+    table.insert(res, round_start)
+    table.insert(res, { ' ', 'SymbolUsageImpl' })
+    table.insert(res, { stacked_functions_content, 'SymbolUsageContent' })
     table.insert(res, round_end)
   end
 
@@ -256,6 +276,11 @@ vim.api.nvim_set_hl(0, 'SymbolUsageImplRound', { fg = h('@parameter').fg })
 local function text_format(symbol)
   local res = {}
 
+  -- Indicator that shows if there are any other symbols in the same line
+  local stacked_functions_content = symbol.stacked_count > 0
+      and ("+%s"):format(symbol.stacked_count)
+      or ''
+
   if symbol.references then
     table.insert(res, { '󰍞', 'SymbolUsageRefRound' })
     table.insert(res, { '󰌹 ' .. tostring(symbol.references), 'SymbolUsageRef' })
@@ -277,6 +302,15 @@ local function text_format(symbol)
     end
     table.insert(res, { '󰍞', 'SymbolUsageImplRound' })
     table.insert(res, { '󰡱 ' .. tostring(symbol.implementation), 'SymbolUsageImpl' })
+    table.insert(res, { '󰍟', 'SymbolUsageImplRound' })
+  end
+
+  if stacked_functions_content ~= '' then
+    if #res > 0 then
+      table.insert(res, { ' ', 'NonText' })
+    end
+    table.insert(res, { '󰍞', 'SymbolUsageImplRound' })
+    table.insert(res, { ' ' .. tostring(stacked_functions_content), 'SymbolUsageImpl' })
     table.insert(res, { '󰍟', 'SymbolUsageImplRound' })
   end
 
