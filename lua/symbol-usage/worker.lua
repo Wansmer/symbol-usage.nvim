@@ -185,7 +185,7 @@ function W:traversal(symbol_tree)
               actual[symbol_id].methods[method] = 0
             else
               actual[symbol_id] = {
-                methods = method,
+                methods = { method = 0 },
                 render = false,
                 line = pos.line,
               }
