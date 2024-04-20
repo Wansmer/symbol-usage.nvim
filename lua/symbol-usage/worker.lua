@@ -186,6 +186,7 @@ function W:traversal(symbol_tree)
             else
               actual[symbol_id] = {
                 methods = { method = 0 },
+                method = method,
                 render = false,
                 line = pos.line,
               }
@@ -224,18 +225,18 @@ function W:traversal(symbol_tree)
     end
 
     local result = {}
-    for key, value in pairs(walk_result) do
-      if value.render then
-        for _, otherValue in pairs(walk_result) do
-          if not otherValue.render and otherValue.line == value.line then
-            value.methods[otherValue.methods] = value.methods[otherValue.methods] + 1
+    for symbol_id, symbol in pairs(walk_result) do
+      if symbol.render then
+        for _, otherSymbol in pairs(walk_result) do
+          if not otherSymbol.render and otherSymbol.line == symbol.line then
+            symbol.methods[otherSymbol.method] = symbol.methods[otherSymbol.method] + 1
 
-            self.symbols[key].stacked_count = self.symbols[key].stacked_count + 1
+            self.symbols[symbol_id].stacked_count = self.symbols[symbol_id].stacked_count + 1
           end
         end
-        result[key] = value
+        result[symbol_id] = symbol
       else
-        result[key] = value
+        result[symbol_id] = symbol
       end
     end
 
