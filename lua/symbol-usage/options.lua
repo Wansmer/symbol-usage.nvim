@@ -44,9 +44,7 @@ S._default_opts = {
     local fragments = {}
 
     -- Indicator that shows if there are any other symbols in the same line
-    local stacked_functions = (symbol.stacked_count > 0)
-        and (' | +%s'):format(symbol.stacked_count)
-        or ''
+    local stacked_functions = (symbol.stacked_count > 0) and (' | +%s'):format(symbol.stacked_count) or ''
 
     if symbol.references then
       local usage = symbol.references <= 1 and 'usage' or 'usages'
