@@ -162,8 +162,8 @@ function W:traversal(symbol_tree)
 
         for _, method in pairs({ 'references', 'definition', 'implementation' }) do
           if self:is_need_count(symbol, method, parent) then
-            if not u.table_contains(booked_lines[method] or {}, symbol.range.start.line) then
-              table.insert(booked_lines[method], symbol.range.start.line)
+            if not u.table_contains(booked_lines[method] or {}, pos.line) then
+              table.insert(booked_lines[method], pos.line)
 
               -- If symbol is new, add mock
               if not self.symbols[symbol_id] or not actual[symbol_id] then
@@ -177,8 +177,8 @@ function W:traversal(symbol_tree)
                   symbol_id = symbol_id,
                   symbol = symbol,
                   render = true,
-                  line = symbol.range.start.line,
-                  start_character = symbol.range.start.character,
+                  line = pos.line,
+                  start_character = pos.character,
                 }
               end
 
@@ -187,7 +187,7 @@ function W:traversal(symbol_tree)
               actual[symbol_id] = {
                 methods = method,
                 render = false,
-                line = symbol.range.start.line,
+                line = pos.line,
               }
             end
           end
@@ -204,7 +204,12 @@ function W:traversal(symbol_tree)
 
   return (function()
     local function sort_by_start_character(a, b)
-      return a.range.start.character < b.range.start.character
+      local pos_a = u.get_position(a, self.opts)
+      local pos_b = u.get_position(b, self.opts)
+      if not (pos_a and pos_b) then
+        return false
+      end
+      return pos_a.character < pos_b.character
     end
 
     local sorted_data = {}
