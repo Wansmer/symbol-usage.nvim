@@ -4,6 +4,8 @@ M.NS = vim.api.nvim_create_namespace('__symbol__')
 M.GROUP = vim.api.nvim_create_augroup('__symbol__', { clear = true })
 M.NESTED_GROUP = vim.api.nvim_create_augroup('__symbol_nested__', { clear = true })
 
+M.is_list = vim.fn.has('nvim-0.10') == 1 and vim.islist or vim.tbl_islist
+
 ---Check if a table contains a value
 ---@param tbl table
 ---@param x any
@@ -38,7 +40,7 @@ function M.make_params(ref)
 end
 
 function M.some(tbl, cb)
-  if not vim.tbl_islist(tbl) or vim.tbl_isempty(tbl) then
+  if not M.is_list(tbl) or vim.tbl_isempty(tbl) then
     return false
   end
 
@@ -52,7 +54,7 @@ function M.some(tbl, cb)
 end
 
 function M.every(tbl, cb)
-  if not vim.tbl_islist(tbl) or vim.tbl_isempty(tbl) then
+  if not M.is_list(tbl) or vim.tbl_isempty(tbl) then
     return false
   end
 
@@ -70,7 +72,7 @@ end
 ---@param target_key string Name of target key
 ---@return any|nil
 function M.get_nested_key_value(tbl, target_key)
-  if not tbl or vim.tbl_islist(tbl) then
+  if not tbl or M.is_list(tbl) then
     return nil
   end
   local found
@@ -78,7 +80,7 @@ function M.get_nested_key_value(tbl, target_key)
     if key == target_key then
       return val
     end
-    if type(val) == 'table' and not vim.tbl_islist(val) then
+    if type(val) == 'table' and not M.is_list(val) then
       found = M.get_nested_key_value(val, target_key)
     end
     if found then
