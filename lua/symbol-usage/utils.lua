@@ -21,7 +21,7 @@ function M.table_contains(tbl, x)
 end
 
 ---Check if client supports method
----@param client lsp.Client
+---@param client vim.lsp.Client
 ---@param method string
 ---@return boolean
 function M.support_method(client, method)
@@ -148,7 +148,7 @@ function M.make_extmark_opts(text, pos, line, bufnr, id)
       return { sign_text = sign, sign_hl_group = hl }
     end,
     textwidth = function()
-      local shift = not is_tbl and #text or get_vt_length(vtext)
+      local shift = not is_tbl and #text or get_vt_length(vtext --[[@as table]])
       return { virt_text = vtext, virt_text_win_col = tonumber(vim.bo[bufnr].textwidth) - (shift + 1) }
     end,
     above = function()

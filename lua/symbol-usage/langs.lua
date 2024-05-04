@@ -11,6 +11,9 @@ end
 local filter_js_vars = {
   function(data)
     local symbol, _, bufnr = data.symbol, data.parent, data.bufnr
+    if not vim.api.buf_is_loaded(bufnr) then
+      return
+    end
     if is_ts(bufnr) then
       local pos = { symbol.range.start.line, symbol.range.start.character }
       -- Treesitter may still lose buffer context
