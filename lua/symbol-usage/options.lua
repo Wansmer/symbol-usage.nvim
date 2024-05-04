@@ -11,7 +11,7 @@ local SymbolKind = vim.lsp.protocol.SymbolKind
 ---@class ImplementationOpts
 ---@field enabled boolean
 
----@alias VirtualHlText string|table<number, { text: string, hl_group: string }}>
+---@alias VirtualHlText string|table<number, { text: string, hl_group: string }>
 
 ---@alias Formatter function(symbol: Symbol): VirtualHlText
 ---@alias VTPosition 'above'|'end_of_line'|'textwidth'|'signcolumn'
@@ -86,12 +86,12 @@ function S.update(user_opts)
   if not hl then
     hl = S.opts.hl
   end
-  vim.api.nvim_set_hl(0, 'SymbolUsageText', hl)
+  vim.api.nvim_set_hl(0, 'SymbolUsageText', hl --[[@as vim.api.keyset.highlight]])
 
   -- so the hl persists across color scheme changes
   vim.api.nvim_create_autocmd('ColorScheme', {
     callback = function()
-      vim.api.nvim_set_hl(0, 'SymbolUsageText', hl)
+      vim.api.nvim_set_hl(0, 'SymbolUsageText', hl --[[@as vim.api.keyset.highlight]])
     end,
   })
 end

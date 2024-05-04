@@ -15,7 +15,7 @@ local ns = u.NS
 
 ---@class Worker
 ---@field bufnr number Buffer id
----@field client lsp.Client
+---@field client vim.lsp.Client
 ---@field opts UserOpts
 ---@field symbols table<string, Symbol>
 ---@field buf_version integer
@@ -24,7 +24,7 @@ W.__index = W
 
 ---New worker for buffer and client
 ---@param bufnr integer Buffer id
----@param client lsp.Client
+---@param client vim.lsp.Client
 ---@return Worker
 function W.new(bufnr, client)
   return setmetatable({
