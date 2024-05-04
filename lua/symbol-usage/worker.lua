@@ -39,10 +39,10 @@ end
 ---Run worker for buffer
 ---@param check_version? boolean|nil
 function W:run(check_version)
-  local ft = vim.bo[self.bufnr].filetype
   local no_run = not state.active
+    or not vim.api.nvim_buf_is_valid(self.bufnr)
     or vim.tbl_contains(self.opts.disable.lsp, self.client.name)
-    or vim.tbl_contains(self.opts.disable.filetypes, ft)
+    or vim.tbl_contains(self.opts.disable.filetypes, vim.bo[self.bufnr].filetype)
     or u.some(self.opts.disable.cond, function(cb)
       return cb(self.bufnr)
     end)
@@ -66,6 +66,11 @@ end
 ---Collect textDocument symbols
 function W:collect_symbols()
   local function handler(_, response, ctx)
+    if not vim.api.nvim_buf_is_valid(self.bufnr) then
+      state.remove_buffer(self.bufnr)
+      return
+    end
+
     if not response or vim.tbl_isempty(response) then
       -- When the entire buffer content is deleted
       self:clear_unused_symbols({})
@@ -299,7 +304,8 @@ function W:count_method(method, symbol_id, symbol)
   end
 
   local function handler(err, response, ctx)
-    if err then
+    if err or not vim.api.nvim_buf_is_valid(self.bufnr) then
+      state.remove_buffer(self.bufnr)
       return
     end
 
