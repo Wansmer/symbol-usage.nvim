@@ -11,7 +11,7 @@ end
 local filter_js_vars = {
   function(data)
     local symbol, _, bufnr = data.symbol, data.parent, data.bufnr
-    if not vim.api.buf_is_loaded(bufnr) then
+    if not vim.api.nvim_buf_is_loaded(bufnr) then
       return
     end
     if is_ts(bufnr) then
