@@ -41,8 +41,8 @@ end
 ---@param bufnr integer Buffer id
 function M.clear_buffer(bufnr)
   state.remove_buffer(bufnr)
-  vim.api.nvim_buf_clear_namespace(bufnr, u.NS, 0, -1)
-  vim.api.nvim_clear_autocmds({ buffer = bufnr, group = u.NESTED_GROUP })
+  pcall(vim.api.nvim_buf_clear_namespace, bufnr, u.NS, 0, -1)
+  pcall(vim.api.nvim_clear_autocmds, { buffer = bufnr, group = u.NESTED_GROUP })
 end
 
 ---Attach workers for buffer
