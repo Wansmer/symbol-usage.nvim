@@ -20,7 +20,7 @@ function state.add_worker(bufnr, worker)
   else
     -- avoid duplicates workers
     if u.some(state.buffers[bufnr], function(v)
-      return v.client.client_id == worker.client.client_id
+      return v.client.id == worker.client.id
     end) then
       return false
     end

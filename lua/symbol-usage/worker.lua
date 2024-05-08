@@ -67,7 +67,6 @@ end
 function W:collect_symbols()
   local function handler(_, response, ctx)
     if not vim.api.nvim_buf_is_valid(self.bufnr) then
-      state.remove_buffer(self.bufnr)
       return
     end
 
@@ -305,7 +304,6 @@ function W:count_method(method, symbol_id, symbol)
 
   local function handler(err, response, ctx)
     if err or not vim.api.nvim_buf_is_valid(self.bufnr) then
-      state.remove_buffer(self.bufnr)
       return
     end
 
