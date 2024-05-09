@@ -159,7 +159,7 @@ function M.make_extmark_opts(text, pos, line, bufnr, id)
       if ok and l and not vim.tbl_isempty(l) then
         indent = l[1]:match('^(%s*)')
       end
-      vtext[1][1] = indent .. (is_tbl and text[1][1] or text)
+      table.insert(vtext --[[@as table]], 1, { indent, 'NonText' })
       return { virt_lines = { vtext }, virt_lines_above = true }
     end,
   }
