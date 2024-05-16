@@ -107,7 +107,7 @@ end
 ---@param parent table Uses in kinds_filters
 ---@return boolean
 function W:is_need_count(symbol, method, parent)
-  if not self.opts[method].enabled or not u.support_method(self.client, method) then
+  if not (self.opts[method].enabled and u.support_method(self.client, method)) then
     return false
   end
 
