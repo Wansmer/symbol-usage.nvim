@@ -26,6 +26,7 @@ local SymbolKind = vim.lsp.protocol.SymbolKind
 ---@field definition? DefinitionOpts Opts for definitions
 ---@field implementation? ImplementationOpts Opts for implementations
 ---@field vt_position? VTPosition Virtual text position (`above` by default)
+---@field vt_priority? integer Virtual text priority (see `nvim_buf_set_extmark`)
 ---@field request_pending_text? string|table|false Text to display when request is pending. If `false`, extmark will not be created until the request is finished. Recommended to use with `above` vt_position to avoid "jumping lines".
 ---@field symbol_request_pos? 'start'|'end' At which position of `symbol.selectionRange` the request to the lsp server should start. Default is `end` (try changing it to `start` if the symbol counting is not correct).
 ---@field disable? { lsp?: string[], filetypes?: string[], cond?: function[] } Disables `symbol-usage.nvim' for specific LSPs, filetypes, or on custom conditions. The function in the `cond` list takes an argument `bufnr` and returns a boolean. If it returns true, `symbol-usage` will not run in that buffer.

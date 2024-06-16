@@ -69,6 +69,7 @@ require('symbol-usage').setup({
   kinds_filter = {},
   ---@type 'above'|'end_of_line'|'textwidth'|'signcolumn' `above` by default
   vt_position = 'above',
+  vt_priority = nil, ---@type integer Virtual text priority (see `nvim_buf_set_extmark`)
   ---Text to display when request is pending. If `false`, extmark will not be
   ---created until the request is finished. Recommended to use with `above`
   ---vt_position to avoid "jumping lines".

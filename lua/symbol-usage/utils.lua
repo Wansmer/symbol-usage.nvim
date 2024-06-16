@@ -129,12 +129,12 @@ end
 
 ---Make opts for extmark according opts.vt_position
 ---@param text string|table Virtual text
----@param pos VTPosition
+---@param opts UserOpts
 ---@param line integer 0-index line number
 ---@param bufnr integer Buffer id
 ---@param id integer|nil Extmark id
 ---@return table Opts for |nvim_buf_set_extmark()|
-function M.make_extmark_opts(text, pos, line, bufnr, id)
+function M.make_extmark_opts(text, opts, line, bufnr, id)
   local is_tbl = type(text) == 'table'
   local vtext = is_tbl and text or { { text, 'SymbolUsageText' } }
 
@@ -164,7 +164,11 @@ function M.make_extmark_opts(text, pos, line, bufnr, id)
     end,
   }
 
-  return vim.tbl_extend('force', modes[pos](), { id = id, hl_mode = 'combine' })
+  return vim.tbl_extend(
+    'force',
+    modes[opts.vt_position](),
+    { id = id, hl_mode = 'combine', priority = opts.vt_priority }
+  )
 end
 
 return M
