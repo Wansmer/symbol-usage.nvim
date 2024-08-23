@@ -91,6 +91,19 @@ require('symbol-usage').setup({
   -- filetypes = {},
   ---@type 'start'|'end' At which position of `symbol.selectionRange` the request to the lsp server should start. Default is `end` (try changing it to `start` if the symbol counting is not correct).
   symbol_request_pos = 'end', -- Recommended redefine only in `filetypes` override table
+  ---@type LoggerConfig
+  log = {
+    level = 'INFO',
+    stdout = {
+      enabled = false,
+      hl = { TRACE = 'None', DEBUG = 'Debug', INFO = 'DiagnosticHint', WARN = 'WarningMsg', ERROR = 'ErrorMsg' },
+    }, -- should log to stdout or not
+    log_file = {
+      enabled = true,
+      path = vim.fs.joinpath(vim.fn.stdpath('cache'), 'symbol-usage.log'),
+    },
+    notify = { enabled = false }, -- should be use `vim.notify` or not
+  },
 })
 ```
 
