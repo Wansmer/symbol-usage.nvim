@@ -47,6 +47,17 @@ function Logger.new(config)
   return logger
 end
 
+local function to_string(...)
+  local res = {}
+  for _, val in pairs({ ... }) do
+    if not (type(val) == 'string' or type(val) == 'number') then
+      val = vim.inspect(val)
+    end
+    table.insert(res, val)
+  end
+  return table.concat(res, ' ')
+end
+
 ---Log message according to level
 ---@param level LogLevel
 ---@vararg any[]
@@ -56,10 +67,10 @@ function Logger:log(level, ...)
   end
 
   local timestamp = os.date('%Y-%m-%d %H:%M:%S')
-  local msg = string.format('%s [%s] %s', timestamp, level, vim.inspect(...))
+  local msg = string.format('%s [%s] %s', timestamp, level, to_string(...))
 
   if self.config.log_file and self.config.log_file.path ~= '' then
-    vim.fn.writefile({ timestamp .. ' ' .. msg }, self.config.log_file.path, 'a')
+    vim.fn.writefile({ msg }, self.config.log_file.path, 'a')
   end
 
   if self.config.stdout.enabled then
