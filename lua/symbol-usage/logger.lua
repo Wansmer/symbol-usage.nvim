@@ -62,7 +62,7 @@ function Logger:log(level, ...)
     vim.fn.writefile({ timestamp .. ' ' .. msg }, self.config.log_file.path, 'a')
   end
 
-  if self.config.stdout then
+  if self.config.stdout.enabled then
     vim.api.nvim_echo({ { msg, self.config.stdout.hl[level] or 'None' } }, true, {})
   end
 
@@ -75,4 +75,7 @@ function Logger:update_config(new_config)
   self.config = vim.tbl_deep_extend('force', self.config, new_config)
 end
 
-return Logger
+-- Logger singleton. Will be enabled in `setup()` with `update_config()`
+local logger = Logger.new()
+
+return logger
