@@ -171,4 +171,20 @@ function M.make_extmark_opts(text, opts, line, bufnr, id)
   )
 end
 
+function M.debounce(cb, ms)
+  local timer ---@type uv_timer_t?
+  return function(...)
+    local args = { ... }
+    if timer then
+      timer:stop()
+      timer:close()
+    end
+
+    timer = vim.defer_fn(function()
+      timer = nil
+      cb(unpack(args))
+    end, ms)
+  end
+end
+
 return M
