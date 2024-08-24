@@ -1,6 +1,7 @@
 local u = require('symbol-usage.utils')
 local o = require('symbol-usage.options')
 local state = require('symbol-usage.state')
+local log = require('symbol-usage.logger')
 
 local ns = u.NS
 
@@ -53,8 +54,10 @@ function W:run(force)
 
   local is_changed = self.buf_version ~= vim.lsp.util.buf_versions[self.bufnr]
 
+  -- Run `collect_symbols` only if it is a force refresh or the buffer has been changed
   if is_changed or force then
     self.buf_version = vim.lsp.util.buf_versions[self.bufnr]
+    log.debug('Run `collect_symbols`. Reason:', { force = force, changed = is_changed, buf_version = self.buf_version })
     self:collect_symbols()
   end
 end
@@ -63,10 +66,12 @@ end
 function W:collect_symbols()
   local function handler(_, response, ctx)
     if not vim.api.nvim_buf_is_valid(self.bufnr) then
+      log.warn('`textDocument/documentSymbol` request was skipped. Reason: buffer is not valid')
       return
     end
 
     if not response or vim.tbl_isempty(response) then
+      log.warn('`textDocument/documentSymbol` request was skipped. Reason: no response')
       -- When the entire buffer content is deleted
       self:clear_unused_symbols({})
       return
@@ -74,6 +79,7 @@ function W:collect_symbols()
 
     if vim.fn.has('nvim-0.10') ~= 0 then
       if ctx.version ~= vim.lsp.util.buf_versions[self.bufnr] then
+        log.warn('`textDocument/documentSymbol` request was skipped. Reason: buffer version is changed during request')
         return
       end
     end
@@ -82,6 +88,7 @@ function W:collect_symbols()
     self:clear_unused_symbols(actual)
   end
 
+  log.debug('Start request `textDocument/documentSymbol`')
   local params = { textDocument = vim.lsp.util.make_text_document_params() }
   self.client.request('textDocument/documentSymbol', params, handler, self.bufnr)
 end
@@ -139,22 +146,40 @@ function W:mock_symbol(symbol_id, pos)
 end
 
 ---Traverse and collect document symbols
----@param symbol_tree table
+---@param symbol_tree table Response of `textDocument/documentSymbol`
 ---@return table
 function W:traversal(symbol_tree)
+  -- Sort by line and by position in line
+  symbol_tree = u.sort(symbol_tree, function(a, b)
+    local pos_a = u.get_position(a, self.opts)
+    local pos_b = u.get_position(b, self.opts)
+    if not (pos_a and pos_b) then
+      return false
+    end
+    if pos_a.line == pos_b.line then
+      return pos_a.character < pos_b.character
+    else
+      return pos_a.line < pos_b.line
+    end
+  end)
+
   local booked_lines = {
     references = {},
     definition = {},
     implementation = {},
   }
 
-  local function _walk(data, parent, actual)
-    for _, symbol in ipairs(data) do
+  ---@param sorted_symbol_tree table Sorted response of `textDocument/documentSymbol`
+  ---@param parent table sorted_symbol_tree item (symbol)
+  ---@param actual table
+  ---@return table
+  local function _walk(sorted_symbol_tree, parent, actual)
+    for _, symbol in ipairs(sorted_symbol_tree) do
       local pos = u.get_position(symbol, self.opts)
       -- If not `pos`, the following actions are useless
       if pos then
         local symbol_id = table.concat({
-          parent and parent.name or '',
+          parent.name or '',
           symbol.kind,
           symbol.name,
           symbol.detail and symbol.detail or '',
@@ -162,34 +187,25 @@ function W:traversal(symbol_tree)
 
         for _, method in pairs({ 'references', 'definition', 'implementation' }) do
           if self:is_need_count(symbol, method, parent) then
-            if not u.table_contains(booked_lines[method] or {}, pos.line) then
-              table.insert(booked_lines[method], pos.line)
-
-              -- If symbol is new, add mock
-              if not self.symbols[symbol_id] or not actual[symbol_id] then
-                if not self.symbols[symbol_id] then
-                  self:mock_symbol(symbol_id, pos)
-                end
-
-                -- Collect actual symbols to remove irrelevant ones afterward
-                actual[symbol_id] = {
-                  methods = { [method] = 0 },
-                  symbol_id = symbol_id,
-                  symbol = symbol,
-                  render = true,
-                  line = pos.line,
-                  start_character = pos.character,
-                }
-              end
-
-              actual[symbol_id].methods[method] = 0
+            local is_first_symbol_on_line = booked_lines[method][pos.line] ~= nil
+            if is_first_symbol_on_line then
+              local first_symbol_id = booked_lines[method][pos.line][1]
+              table.insert(booked_lines[method][pos.line], symbol_id)
+              self.symbols[first_symbol_id].stacked_count = #booked_lines[method][pos.line] - 1
             else
-              actual[symbol_id] = {
-                methods = { method = 0 },
-                method = method,
-                render = false,
-                line = pos.line,
-              }
+              booked_lines[method][pos.line] = { symbol_id }
+            end
+
+            -- If symbol is new and it is the first symbol on the line, add mock
+            if not self.symbols[symbol_id] and not is_first_symbol_on_line then
+              self:mock_symbol(symbol_id, pos)
+            end
+
+            -- Collect actual symbols to remove irrelevant ones afterward
+            actual[symbol_id] = true
+
+            if not is_first_symbol_on_line then
+              self:count_method(method, symbol_id, symbol)
             end
           end
         end
@@ -203,58 +219,7 @@ function W:traversal(symbol_tree)
     return actual
   end
 
-  return (function()
-    local function sort_by_start_character(a, b)
-      local pos_a = u.get_position(a, self.opts)
-      local pos_b = u.get_position(b, self.opts)
-      if not (pos_a and pos_b) then
-        return false
-      end
-      return pos_a.character < pos_b.character
-    end
-
-    local sorted_data = {}
-    for _, item in ipairs(symbol_tree) do
-      table.insert(sorted_data, item)
-    end
-    table.sort(sorted_data, sort_by_start_character)
-
-    local walk_result = _walk(sorted_data, '', {})
-    for _, element in pairs(self.symbols) do
-      element.stacked_count = 0
-    end
-
-    local result = {}
-    for symbol_id, symbol in pairs(walk_result) do
-      if symbol.render then
-        for _, otherSymbol in pairs(walk_result) do
-          if not otherSymbol.render and otherSymbol.line == symbol.line then
-            symbol.methods[otherSymbol.method] = symbol.methods[otherSymbol.method] + 1
-
-            self.symbols[symbol_id].stacked_count = self.symbols[symbol_id].stacked_count + 1
-          end
-        end
-        result[symbol_id] = symbol
-      else
-        result[symbol_id] = symbol
-      end
-    end
-
-    -- Deleting elements with `value.render == false`
-    for key, value in pairs(result) do
-      if not value.render then
-        result[key] = nil
-      end
-    end
-
-    for _, value in pairs(result) do
-      for method_name, _ in pairs(value.methods) do
-        self:count_method(method_name, value.symbol_id, value.symbol)
-      end
-    end
-
-    return result
-  end)()
+  return _walk(symbol_tree, {}, {})
 end
 
 ---Set or update extmark.
