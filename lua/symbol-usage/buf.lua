@@ -8,7 +8,7 @@ local M = {}
 ---Set nested autocmd for buffer
 ---@param bufnr integer Buffer id
 function M.set_buf_autocmd(bufnr)
-  local opts = function(check_version)
+  local opts = function(force)
     return {
       buffer = bufnr,
       group = u.NESTED_GROUP,
@@ -16,23 +16,24 @@ function M.set_buf_autocmd(bufnr)
       callback = u.debounce(function(e)
         for _, wkr in pairs(state.get_buf_workers(e.buf)) do
           log.debug('Update worker on "' .. e.event .. '" for buffer', vim.api.nvim_buf_get_name(bufnr))
-          wkr:run(check_version)
+          wkr:run(force)
         end
       end, 200),
     }
   end
 
-  vim.api.nvim_create_autocmd({ 'TextChanged', 'InsertLeave' }, opts(true))
-  -- Force refresh on BufEnter because the symbol usage data may have changed in other buffers
-  vim.api.nvim_create_autocmd('BufEnter', opts(false))
+  vim.api.nvim_create_autocmd({ 'TextChanged', 'InsertLeave' }, opts(false))
   vim.api.nvim_create_autocmd('WinScrolled', opts(false))
 
+  -- Force refresh on BufEnter because the symbol usage data may have changed in other buffers
+  vim.api.nvim_create_autocmd('BufEnter', opts(true))
+
   if vim.fn.has('nvim-0.10') ~= 0 then
-    local o = opts(true)
+    local o = opts(false)
     o.callback = u.debounce(function(e)
       if e.data.method == 'textDocument/didOpen' then
         for _, wkr in pairs(state.get_buf_workers(e.buf)) do
-          wkr:run(true)
+          wkr:run(false)
         end
       end
     end, 200)
@@ -69,8 +70,8 @@ function M.attach_buffer(bufnr)
     -- false if worker with this client for buffer already exists
     local need_run = state.add_worker(bufnr, w)
     if need_run then
-      log.debug('Run worker for buffer', vim.api.nvim_buf_get_name(bufnr))
-      w:run(false)
+      log.debug('Run worker for buffer', vim.api.nvim_buf_get_name(bufnr), 'Reason: attach_buffer')
+      w:run(true)
     end
   end
 

@@ -37,8 +37,8 @@ function W.new(bufnr, client)
 end
 
 ---Run worker for buffer
----@param check_version? boolean|nil
-function W:run(check_version)
+---@param force? boolean|nil
+function W:run(force)
   local no_run = not state.active
     or not vim.api.nvim_buf_is_valid(self.bufnr)
     or vim.tbl_contains(self.opts.disable.lsp, self.client.name)
@@ -51,14 +51,10 @@ function W:run(check_version)
     return
   end
 
-  if check_version then
-    -- Run only if buffer was changed
-    if self.buf_version ~= vim.lsp.util.buf_versions[self.bufnr] then
-      self.buf_version = vim.lsp.util.buf_versions[self.bufnr]
-      self:collect_symbols()
-    end
-  else
-    -- Force refresh
+  local is_changed = self.buf_version ~= vim.lsp.util.buf_versions[self.bufnr]
+
+  if is_changed or force then
+    self.buf_version = vim.lsp.util.buf_versions[self.bufnr]
     self:collect_symbols()
   end
 end
