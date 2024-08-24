@@ -18,7 +18,7 @@ function M.set_buf_autocmd(bufnr)
           log.debug('Update worker on "' .. e.event .. '" for buffer', vim.api.nvim_buf_get_name(bufnr))
           wkr:run(force)
         end
-      end, 200),
+      end, 500),
     }
   end
 
@@ -33,10 +33,11 @@ function M.set_buf_autocmd(bufnr)
     o.callback = u.debounce(function(e)
       if e.data.method == 'textDocument/didOpen' then
         for _, wkr in pairs(state.get_buf_workers(e.buf)) do
+          log.debug('Run worker on "textDocument/didOpen" for buffer', vim.api.nvim_buf_get_name(bufnr))
           wkr:run(false)
         end
       end
-    end, 200)
+    end, 500)
     vim.api.nvim_create_autocmd({ 'LspNotify' }, o)
   end
 end
