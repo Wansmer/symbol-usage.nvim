@@ -8,11 +8,13 @@ local ns = u.NS
 ---@alias Method 'references'|'definition'|'implementation'
 
 ---@class Symbol
----@field mark_id integer Is of extmark
+---@field mark_id? integer Is of extmark
 ---@field references? integer Count of references
 ---@field definition? integer Count of definitions
 ---@field implementation? integer Count of implementations
 ---@field stacked_count? integer Count of symbols that are on the same line but not displayed
+---@field stacked_symbols? table<string, Symbol> Symbols that are on the same line but not displayed
+---@field is_stacked? boolean Is symbol on the same line but not displayed
 
 ---@class Worker
 ---@field bufnr number Buffer id
@@ -57,6 +59,13 @@ function W:run(force)
   -- Run `collect_symbols` only if it is a force refresh or the buffer has been changed
   if is_changed or force then
     self.buf_version = vim.lsp.util.buf_versions[self.bufnr]
+
+    for _, symbol in pairs(self.symbols) do
+      symbol.is_stacked = nil
+      symbol.stacked_count = 0
+      symbol.stacked_symbols = {}
+    end
+
     log.debug('Run `collect_symbols`. Reason:', { force = force, changed = is_changed, buf_version = self.buf_version })
     self:collect_symbols()
   end
@@ -101,6 +110,10 @@ function W:clear_unused_symbols(actual_symbols)
       pcall(vim.api.nvim_buf_del_extmark, self.bufnr, ns, rec.mark_id)
       self.symbols[id] = nil
     end
+
+    if rec.is_stacked then
+      pcall(vim.api.nvim_buf_del_extmark, self.bufnr, ns, rec.mark_id)
+    end
   end
 end
 
@@ -130,21 +143,6 @@ function W:is_need_count(symbol, method, parent)
   return matches_kind and matches_filter
 end
 
----Add empty table to symbol_id in symbols
----@param symbol_id string
----@param pos table
-function W:mock_symbol(symbol_id, pos)
-  local mock = {}
-  if self.opts.request_pending_text then
-    -- Book a place for a virtual text
-    mock = {
-      mark_id = self:set_extmark(symbol_id, pos.line),
-      stacked_count = 0,
-    }
-  end
-  self.symbols[symbol_id] = mock
-end
-
 ---Traverse and collect document symbols
 ---@param symbol_tree table Response of `textDocument/documentSymbol`
 ---@return table
@@ -163,6 +161,7 @@ function W:traversal(symbol_tree)
     end
   end)
 
+  ---@type table<Method, table<integer, string>>
   local booked_lines = {
     references = {},
     definition = {},
@@ -187,26 +186,28 @@ function W:traversal(symbol_tree)
 
         for _, method in pairs({ 'references', 'definition', 'implementation' }) do
           if self:is_need_count(symbol, method, parent) then
-            local is_first_symbol_on_line = booked_lines[method][pos.line] ~= nil
-            if is_first_symbol_on_line then
-              local first_symbol_id = booked_lines[method][pos.line][1]
-              table.insert(booked_lines[method][pos.line], symbol_id)
-              self.symbols[first_symbol_id].stacked_count = #booked_lines[method][pos.line] - 1
+            local line_is_booked = booked_lines[method][pos.line] ~= nil
+            if line_is_booked then
+              local line_holder_id = booked_lines[method][pos.line]
+
+              -- so that mark_id is not lost if it was set
+              local prev_data = self.symbols[symbol_id] or {}
+              self.symbols[symbol_id] = vim.tbl_deep_extend('force', prev_data, { is_stacked = true })
+              self.symbols[line_holder_id].stacked_symbols[symbol_id] = self.symbols[symbol_id]
             else
-              booked_lines[method][pos.line] = { symbol_id }
+              booked_lines[method][pos.line] = symbol_id
             end
 
-            -- If symbol is new and it is the first symbol on the line, add mock
-            if not self.symbols[symbol_id] and not is_first_symbol_on_line then
-              self:mock_symbol(symbol_id, pos)
+            if not self.symbols[symbol_id] then
+              local mock = { stacked_count = 0, stacked_symbols = {} }
+              if self.opts.request_pending_text then
+                mock.mark_id = self:set_extmark(symbol_id, pos.line)
+              end
+              self.symbols[symbol_id] = mock
             end
 
             -- Collect actual symbols to remove irrelevant ones afterward
-            actual[symbol_id] = true
-
-            if not is_first_symbol_on_line then
-              self:count_method(method, symbol_id, symbol)
-            end
+            actual[symbol_id] = symbol
           end
         end
       end
@@ -219,7 +220,17 @@ function W:traversal(symbol_tree)
     return actual
   end
 
-  return _walk(symbol_tree, {}, {})
+  local actual = _walk(symbol_tree, {}, {})
+
+  for symbol_id, raw_symbol in pairs(actual) do
+    self.symbols[symbol_id].stacked_count = #(vim.tbl_keys(self.symbols[symbol_id].stacked_symbols or {}))
+
+    for _, method in pairs({ 'references', 'definition', 'implementation' }) do
+      self:count_method(method, symbol_id, raw_symbol)
+    end
+  end
+
+  return actual
 end
 
 ---Set or update extmark.
@@ -278,17 +289,27 @@ function W:count_method(method, symbol_id, symbol)
     -- Some clients return `nil` if there are no references (e.g., `lua_ls`)
     local count = response and #response or 0
     local record = self.symbols[symbol_id]
-    local id
 
-    if record and record.mark_id then
-      id = record.mark_id
+    if not record then
+      return
     end
 
-    id = self:set_extmark(symbol_id, params.position.line, { [method] = count }, id)
-    if record and id then
-      record.mark_id = id
-      record[method] = count
+    record[method] = count
+    if not record.is_stacked then
+      record.mark_id = self:set_extmark(symbol_id, params.position.line, { [method] = count }, record.mark_id)
     end
+
+    -- local id
+    --
+    -- if record and record.mark_id then
+    --   id = record.mark_id
+    -- end
+    --
+    -- id = self:set_extmark(symbol_id, params.position.line, { [method] = count }, id)
+    -- if record and id then
+    --   record.mark_id = id
+    --   record[method] = count
+    -- end
   end
 
   self.client.request('textDocument/' .. method, params, handler, self.bufnr)
