@@ -67,6 +67,16 @@ function M.every(tbl, cb)
   return true
 end
 
+---Get sorted copy of table
+---@param tbl table<integer, any>
+---@param predicat function(any, any): boolean
+---@return table
+function M.sort(tbl, predicat)
+  local res = vim.deepcopy(tbl)
+  table.sort(res, predicat)
+  return res
+end
+
 ---Recursively finding key in table and return its value if found or nil
 ---@param tbl table|nil Dict-like table
 ---@param target_key string Name of target key
