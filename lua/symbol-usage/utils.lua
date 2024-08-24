@@ -108,7 +108,7 @@ end
 ---Explanation: Different clients return symbol data with different structures.
 ---@param symbol table Item from 'textDocument/documentSymbol' response
 ---@param opts? UserOpts Lang opts
----@return table?
+---@return { line: integer, character: integer }?
 function M.get_position(symbol, opts)
   opts = opts or {}
   -- First search 'selectionRange' because it gives range to name the symbol
