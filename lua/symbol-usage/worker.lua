@@ -15,6 +15,8 @@ local ns = u.NS
 ---@field stacked_count? integer Count of symbols that are on the same line but not displayed
 ---@field stacked_symbols? table<string, Symbol> Symbols that are on the same line but not displayed
 ---@field is_stacked? boolean Is symbol on the same line but not displayed
+---@field raw_symbol table Item from response of `textDocument/documentSymbol`
+---@field is_rendered? boolean Is symbol rendered
 
 ---@class Worker
 ---@field bufnr number Buffer id
@@ -62,12 +64,27 @@ function W:run(force)
 
     for _, symbol in pairs(self.symbols) do
       symbol.is_stacked = nil
+      symbol.is_rendered = false
       symbol.stacked_count = 0
       symbol.stacked_symbols = {}
     end
 
     log.debug('Run `collect_symbols`. Reason:', { force = force, changed = is_changed, buf_version = self.buf_version })
     self:collect_symbols()
+  else
+    local win_info = vim.fn.getwininfo(vim.api.nvim_get_current_win())[1]
+    local top = win_info.topline
+    local bot = win_info.botline
+
+    for symbol_id, symbol in pairs(self.symbols) do
+      local pos = u.get_position(symbol.raw_symbol, self.opts)
+      if not symbol.is_stacked and not symbol.is_rendered and pos.line >= top and pos.line <= bot then
+        for _, method in pairs({ 'references', 'definition', 'implementation' }) do
+          log.debug("Render symbol '" .. symbol_id .. "' on '" .. method .. "'" .. ' line: ' .. pos.line)
+          self:count_method(method, symbol_id, symbol.raw_symbol)
+        end
+      end
+    end
   end
 end
 
@@ -92,6 +109,8 @@ function W:collect_symbols()
         return
       end
     end
+
+    log.debug('Completed request `textDocument/documentSymbol`')
 
     local actual = self:traversal(response)
     self:clear_unused_symbols(actual)
@@ -192,18 +211,30 @@ function W:traversal(symbol_tree)
 
               -- so that mark_id is not lost if it was set
               local prev_data = self.symbols[symbol_id] or {}
-              self.symbols[symbol_id] = vim.tbl_deep_extend('force', prev_data, { is_stacked = true })
+              self.symbols[symbol_id] = vim.tbl_deep_extend('force', prev_data, {
+                is_rendered = false,
+                is_stacked = true,
+                raw_symbol = symbol,
+              })
               self.symbols[line_holder_id].stacked_symbols[symbol_id] = self.symbols[symbol_id]
             else
               booked_lines[method][pos.line] = symbol_id
             end
 
             if not self.symbols[symbol_id] then
-              local mock = { stacked_count = 0, stacked_symbols = {} }
+              local mock = {
+                stacked_count = 0,
+                stacked_symbols = {},
+                is_rendered = false,
+                raw_symbol = symbol,
+              }
               if self.opts.request_pending_text then
                 mock.mark_id = self:set_extmark(symbol_id, pos.line)
               end
               self.symbols[symbol_id] = mock
+            else
+              -- Restore symbol for corrent range
+              self.symbols[symbol_id].raw_symbol = symbol
             end
 
             -- Collect actual symbols to remove irrelevant ones afterward
@@ -224,9 +255,15 @@ function W:traversal(symbol_tree)
 
   for symbol_id, raw_symbol in pairs(actual) do
     self.symbols[symbol_id].stacked_count = #(vim.tbl_keys(self.symbols[symbol_id].stacked_symbols or {}))
+    local pos = u.get_position(raw_symbol, self.opts)
+    local win_info = vim.fn.getwininfo(vim.api.nvim_get_current_win())[1]
+    local top = win_info.topline
+    local bot = win_info.botline
 
-    for _, method in pairs({ 'references', 'definition', 'implementation' }) do
-      self:count_method(method, symbol_id, raw_symbol)
+    if pos and pos.line >= top and pos.line <= bot then
+      for _, method in pairs({ 'references', 'definition', 'implementation' }) do
+        self:count_method(method, symbol_id, raw_symbol)
+      end
     end
   end
 
@@ -297,19 +334,8 @@ function W:count_method(method, symbol_id, symbol)
     record[method] = count
     if not record.is_stacked then
       record.mark_id = self:set_extmark(symbol_id, params.position.line, { [method] = count }, record.mark_id)
+      record.is_rendered = true
     end
-
-    -- local id
-    --
-    -- if record and record.mark_id then
-    --   id = record.mark_id
-    -- end
-    --
-    -- id = self:set_extmark(symbol_id, params.position.line, { [method] = count }, id)
-    -- if record and id then
-    --   record.mark_id = id
-    --   record[method] = count
-    -- end
   end
 
   self.client.request('textDocument/' .. method, params, handler, self.bufnr)
