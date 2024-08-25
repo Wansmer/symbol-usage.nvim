@@ -27,7 +27,7 @@ describe('`symbol-usage`', function()
   it('found 8 convenient symbols to counting', function()
     local worker = require('symbol-usage.state').get_buf_workers(bufnr)[1]
 
-    assert.equal(8, #vim.tbl_keys(worker.symbols))
+    assert.equal(8, vim.tbl_count(worker.symbols))
   end)
 
   it('expected extmarks in the viewport were set with correct counting', function()

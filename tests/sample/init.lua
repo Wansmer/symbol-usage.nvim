@@ -21,4 +21,9 @@ one() two() two() six()
 local function seven() end
   local function eight() end
 seven()
+
+-- Symbols below should not be counted
+local a = 1
+local b = 2
+local c = {}
 -- stylua: ignore end
