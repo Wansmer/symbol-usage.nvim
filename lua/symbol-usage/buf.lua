@@ -71,7 +71,7 @@ function M.attach_buffer(bufnr)
     -- false if worker with this client for buffer already exists
     local need_run = state.add_worker(bufnr, w)
     if need_run then
-      log.debug('Run worker for buffer', vim.api.nvim_buf_get_name(bufnr), 'Reason: attach_buffer')
+      log.debug('Run worker ' .. client.name .. ' for buffer', vim.api.nvim_buf_get_name(bufnr), 'Reason: attach_buffer')
       w:run(true)
     end
   end

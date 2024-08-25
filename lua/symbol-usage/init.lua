@@ -14,9 +14,10 @@ function M.setup(opts)
 
   vim.api.nvim_create_autocmd({ 'LspAttach' }, {
     group = u.GROUP,
-    callback = function(event)
+    callback = u.debounce(function(event)
+      log.debug('Run `attach_buffer`', event.event)
       buf.attach_buffer(event.buf)
-    end,
+    end, 500),
   })
 
   vim.api.nvim_create_autocmd('LspDetach', {
