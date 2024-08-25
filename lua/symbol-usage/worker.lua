@@ -270,8 +270,6 @@ function W:traversal(symbol_tree)
 
     if pos and pos.line >= top and pos.line <= bot then
       for _, method in pairs({ 'references', 'definition', 'implementation' }) do
-        print("Check symbol '" .. symbol_id .. "' on '" .. method .. "'" .. ' line: ' .. pos.line)
-        print('Allowed methods: ' .. vim.inspect(self.symbols[symbol_id].allowed_methods))
         if self.symbols[symbol_id].allowed_methods[method] then
           self:count_method(method, symbol_id, raw_symbol)
         end
