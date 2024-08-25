@@ -15,9 +15,10 @@ local ns = u.NS
 ---@field stacked_count? integer Count of symbols that are on the same line but not displayed
 ---@field stacked_symbols? table<string, Symbol> Symbols that are on the same line but not displayed
 ---@field is_stacked? boolean Is symbol on the same line but not displayed
----@field raw_symbol table Item from response of `textDocument/documentSymbol`
 ---@field is_rendered? boolean Is symbol rendered
----@field allowed_methods table<Method, boolean> Method to count
+---@field allowed_methods table<integer, Method> Method to count
+---@field raw_symbol table Item from response of `textDocument/documentSymbol`
+---@field version? integer LSP version
 
 ---@class Worker
 ---@field bufnr number Buffer id
@@ -80,11 +81,9 @@ function W:run(force)
     for symbol_id, symbol in pairs(self.symbols) do
       local pos = u.get_position(symbol.raw_symbol, self.opts)
       if not symbol.is_stacked and not symbol.is_rendered and pos.line >= top and pos.line <= bot then
-        for _, method in pairs({ 'references', 'definition', 'implementation' }) do
+        for _, method in pairs(symbol.allowed_methods) do
           log.debug("Render symbol '" .. symbol_id .. "' on '" .. method .. "'" .. ' line: ' .. pos.line)
-          if self.symbols[symbol_id].allowed_methods[method] then
-            self:count_method(method, symbol_id, symbol.raw_symbol)
-          end
+          self:count_method(method, symbol_id, symbol.raw_symbol)
         end
       end
     end
@@ -183,77 +182,81 @@ function W:traversal(symbol_tree)
     end
   end)
 
-  ---@type table<Method, table<integer, string>>
-  local booked_lines = {
-    references = {},
-    definition = {},
-    implementation = {},
-  }
-
   ---@param sorted_symbol_tree table Sorted response of `textDocument/documentSymbol`
   ---@param parent table sorted_symbol_tree item (symbol)
   ---@param actual table
   ---@return table
   local function _walk(sorted_symbol_tree, parent, actual)
+    ---@type table<integer, string>
+    local booked_lines = {}
+
     for _, symbol in ipairs(sorted_symbol_tree) do
-      local pos = u.get_position(symbol, self.opts)
-      -- If not `pos`, the following actions are useless
-      if pos then
-        local symbol_id = table.concat({
-          parent.name or '',
-          symbol.kind,
-          symbol.name,
-          symbol.detail and symbol.detail or '',
-        })
-
-        for _, method in pairs({ 'references', 'definition', 'implementation' }) do
-          if self:is_need_count(symbol, method, parent) then
-            local mock_data = {
-              is_stacked = false,
-              stacked_count = 0,
-              stacked_symbols = {},
-              is_rendered = false,
-              raw_symbol = symbol,
-              allowed_methods = { [method] = true },
-            }
-
-            local line_is_booked = booked_lines[method][pos.line] ~= nil
-            if line_is_booked then
-              local line_holder_id = booked_lines[method][pos.line]
-
-              -- so that mark_id is not lost if it was set for correct deleting this mark
-              local prev_data = self.symbols[symbol_id] or {}
-              mock_data.mark_id = prev_data.mark_id
-              self.symbols[symbol_id] = vim.tbl_deep_extend('force', mock_data, {
-                is_rendered = false,
-                is_stacked = true,
-                raw_symbol = symbol,
-                allowed_methods = { [method] = true },
-              })
-              self.symbols[line_holder_id].stacked_symbols[symbol_id] = self.symbols[symbol_id]
-            else
-              booked_lines[method][pos.line] = symbol_id
-            end
-
-            if not self.symbols[symbol_id] then
-              if self.opts.request_pending_text then
-                mock_data.mark_id = self:set_extmark(symbol_id, pos.line)
-              end
-              self.symbols[symbol_id] = mock_data
-            else
-              -- Restore symbol for corrent range
-              self.symbols[symbol_id].raw_symbol = symbol
-            end
-
-            -- Collect actual symbols to remove irrelevant ones afterward
-            actual[symbol_id] = symbol
-          end
-        end
-      end
-
       if symbol.children and not vim.tbl_isempty(symbol.children) then
         _walk(symbol.children, symbol, actual)
       end
+
+      local pos = u.get_position(symbol, self.opts)
+      -- If not `pos`, the following actions are useless
+      if not pos then
+        goto continue
+      end
+
+      local allowed_methods = (function()
+        local res = {}
+        for _, method in pairs({ 'references', 'definition', 'implementation' }) do
+          if self:is_need_count(symbol, method, parent) then
+            table.insert(res, method)
+          end
+        end
+        return res
+      end)()
+
+      -- Do not store symbols that do not need to be counted for all methods
+      if #allowed_methods == 0 then
+        goto continue
+      end
+
+      local symbol_id = table.concat({
+        parent.name or '',
+        symbol.kind,
+        symbol.name,
+        symbol.detail and symbol.detail or '',
+      })
+
+      local line_holder_id = booked_lines[pos.line]
+      if not line_holder_id then
+        booked_lines[pos.line] = symbol_id
+      end
+
+      local symbol_data = {
+        is_stacked = line_holder_id ~= nil,
+        stacked_count = 0,
+        stacked_symbols = {},
+        is_rendered = false, -- TODO: should I restore it?
+        raw_symbol = symbol,
+        version = self.buf_version,
+        allowed_methods = allowed_methods,
+      }
+
+      -- Keep mark_id from previous symbol data if it exists
+      symbol_data = vim.tbl_deep_extend('force', self.symbols[symbol_id] or {}, symbol_data)
+
+      -- TODO: should I set pending text here?
+      -- Set pending text
+      if not (symbol_data.mark_id or symbol_data.is_stacked) and self.opts.request_pending_text then
+        symbol_data.mark_id = self:set_extmark(symbol_id, pos.line)
+      end
+
+      if symbol_data.is_stacked then
+        self.symbols[line_holder_id].stacked_symbols[symbol_id] = symbol_data
+      end
+
+      self.symbols[symbol_id] = symbol_data
+
+      -- Collect actual symbols to remove irrelevant ones afterward
+      actual[symbol_id] = symbol
+
+      ::continue::
     end
 
     return actual
@@ -269,10 +272,8 @@ function W:traversal(symbol_tree)
     local bot = win_info.botline
 
     if pos and pos.line >= top and pos.line <= bot then
-      for _, method in pairs({ 'references', 'definition', 'implementation' }) do
-        if self.symbols[symbol_id].allowed_methods[method] then
-          self:count_method(method, symbol_id, raw_symbol)
-        end
+      for _, method in pairs(self.symbols[symbol_id].allowed_methods) do
+        self:count_method(method, symbol_id, raw_symbol)
       end
     end
   end
