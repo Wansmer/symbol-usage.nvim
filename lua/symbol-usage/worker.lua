@@ -17,6 +17,7 @@ local ns = u.NS
 ---@field is_stacked? boolean Is symbol on the same line but not displayed
 ---@field raw_symbol table Item from response of `textDocument/documentSymbol`
 ---@field is_rendered? boolean Is symbol rendered
+---@field allowed_methods table<Method, boolean> Method to count
 
 ---@class Worker
 ---@field bufnr number Buffer id
@@ -81,7 +82,9 @@ function W:run(force)
       if not symbol.is_stacked and not symbol.is_rendered and pos.line >= top and pos.line <= bot then
         for _, method in pairs({ 'references', 'definition', 'implementation' }) do
           log.debug("Render symbol '" .. symbol_id .. "' on '" .. method .. "'" .. ' line: ' .. pos.line)
-          self:count_method(method, symbol_id, symbol.raw_symbol)
+          if self.symbols[symbol_id].allowed_methods[method] then
+            self:count_method(method, symbol_id, symbol.raw_symbol)
+          end
         end
       end
     end
@@ -205,16 +208,27 @@ function W:traversal(symbol_tree)
 
         for _, method in pairs({ 'references', 'definition', 'implementation' }) do
           if self:is_need_count(symbol, method, parent) then
+            local mock_data = {
+              is_stacked = false,
+              stacked_count = 0,
+              stacked_symbols = {},
+              is_rendered = false,
+              raw_symbol = symbol,
+              allowed_methods = { [method] = true },
+            }
+
             local line_is_booked = booked_lines[method][pos.line] ~= nil
             if line_is_booked then
               local line_holder_id = booked_lines[method][pos.line]
 
-              -- so that mark_id is not lost if it was set
+              -- so that mark_id is not lost if it was set for correct deleting this mark
               local prev_data = self.symbols[symbol_id] or {}
-              self.symbols[symbol_id] = vim.tbl_deep_extend('force', prev_data, {
+              mock_data.mark_id = prev_data.mark_id
+              self.symbols[symbol_id] = vim.tbl_deep_extend('force', mock_data, {
                 is_rendered = false,
                 is_stacked = true,
                 raw_symbol = symbol,
+                allowed_methods = { [method] = true },
               })
               self.symbols[line_holder_id].stacked_symbols[symbol_id] = self.symbols[symbol_id]
             else
@@ -222,16 +236,10 @@ function W:traversal(symbol_tree)
             end
 
             if not self.symbols[symbol_id] then
-              local mock = {
-                stacked_count = 0,
-                stacked_symbols = {},
-                is_rendered = false,
-                raw_symbol = symbol,
-              }
               if self.opts.request_pending_text then
-                mock.mark_id = self:set_extmark(symbol_id, pos.line)
+                mock_data.mark_id = self:set_extmark(symbol_id, pos.line)
               end
-              self.symbols[symbol_id] = mock
+              self.symbols[symbol_id] = mock_data
             else
               -- Restore symbol for corrent range
               self.symbols[symbol_id].raw_symbol = symbol
@@ -262,7 +270,11 @@ function W:traversal(symbol_tree)
 
     if pos and pos.line >= top and pos.line <= bot then
       for _, method in pairs({ 'references', 'definition', 'implementation' }) do
-        self:count_method(method, symbol_id, raw_symbol)
+        print("Check symbol '" .. symbol_id .. "' on '" .. method .. "'" .. ' line: ' .. pos.line)
+        print('Allowed methods: ' .. vim.inspect(self.symbols[symbol_id].allowed_methods))
+        if self.symbols[symbol_id].allowed_methods[method] then
+          self:count_method(method, symbol_id, raw_symbol)
+        end
       end
     end
   end
