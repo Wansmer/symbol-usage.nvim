@@ -101,7 +101,7 @@ function W:collect_symbols()
     if not response or vim.tbl_isempty(response) then
       log.warn('`textDocument/documentSymbol` request was skipped. Reason: no response')
       -- When the entire buffer content is deleted
-      self:clear_unused_symbols({})
+      self:delete_outdated_symbols({})
       return
     end
 
@@ -114,8 +114,7 @@ function W:collect_symbols()
 
     log.debug('Completed request `textDocument/documentSymbol`')
 
-    local actual = self:traversal(response)
-    self:clear_unused_symbols(actual)
+    self:traversal(response)
   end
 
   log.debug('Start request `textDocument/documentSymbol`')
@@ -123,16 +122,15 @@ function W:collect_symbols()
   self.client.request('textDocument/documentSymbol', params, handler, self.bufnr)
 end
 
----Clear symbols that no longer exist
----@param actual_symbols table<string, boolean>
-function W:clear_unused_symbols(actual_symbols)
+---Delete outdated symbols and their marks
+function W:delete_outdated_symbols()
   for id, rec in pairs(self.symbols) do
-    if not actual_symbols[id] then
+    if rec.version ~= self.buf_version then
       pcall(vim.api.nvim_buf_del_extmark, self.bufnr, ns, rec.mark_id)
       self.symbols[id] = nil
     end
 
-    if rec.is_stacked then
+    if rec.is_stacked and rec.mark_id then
       pcall(vim.api.nvim_buf_del_extmark, self.bufnr, ns, rec.mark_id)
     end
   end
@@ -166,7 +164,6 @@ end
 
 ---Traverse and collect document symbols
 ---@param symbol_tree table Response of `textDocument/documentSymbol`
----@return table
 function W:traversal(symbol_tree)
   -- Sort by line and by position in line
   symbol_tree = u.sort(symbol_tree, function(a, b)
@@ -184,15 +181,14 @@ function W:traversal(symbol_tree)
 
   ---@param sorted_symbol_tree table Sorted response of `textDocument/documentSymbol`
   ---@param parent table sorted_symbol_tree item (symbol)
-  ---@param actual table
   ---@return table
-  local function _walk(sorted_symbol_tree, parent, actual)
+  local function _walk(sorted_symbol_tree, parent )
     ---@type table<integer, string>
     local booked_lines = {}
 
     for _, symbol in ipairs(sorted_symbol_tree) do
       if symbol.children and not vim.tbl_isempty(symbol.children) then
-        _walk(symbol.children, symbol, actual)
+        _walk(symbol.children, symbol)
       end
 
       local pos = u.get_position(symbol, self.opts)
@@ -216,12 +212,7 @@ function W:traversal(symbol_tree)
         goto continue
       end
 
-      local symbol_id = table.concat({
-        parent.name or '',
-        symbol.kind,
-        symbol.name,
-        symbol.detail and symbol.detail or '',
-      })
+      local symbol_id = table.concat({ parent.name or '', symbol.kind, symbol.name, symbol.detail or '' })
 
       local line_holder_id = booked_lines[pos.line]
       if not line_holder_id then
@@ -253,18 +244,15 @@ function W:traversal(symbol_tree)
 
       self.symbols[symbol_id] = symbol_data
 
-      -- Collect actual symbols to remove irrelevant ones afterward
-      actual[symbol_id] = symbol
-
       ::continue::
     end
-
-    return actual
   end
 
-  local actual = _walk(symbol_tree, {}, {})
+  _walk(symbol_tree, {})
 
-  for symbol_id, raw_symbol in pairs(actual) do
+  self:delete_outdated_symbols()
+
+  for symbol_id, raw_symbol in pairs(self.symbols) do
     self.symbols[symbol_id].stacked_count = #(vim.tbl_keys(self.symbols[symbol_id].stacked_symbols or {}))
     local pos = u.get_position(raw_symbol, self.opts)
     local win_info = vim.fn.getwininfo(vim.api.nvim_get_current_win())[1]
@@ -277,8 +265,6 @@ function W:traversal(symbol_tree)
       end
     end
   end
-
-  return actual
 end
 
 ---Set or update extmark.
