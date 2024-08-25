@@ -55,6 +55,7 @@ function W:run(force)
     end)
 
   if no_run then
+    log.debug('Skip `run`. Reason: no_run = true')
     return
   end
 
@@ -66,7 +67,54 @@ function W:run(force)
     log.debug('Run `collect_symbols`. Reason:', { force = force, changed = is_changed, buf_version = self.buf_version })
     self:collect_symbols()
   else
+    log.debug('Skip `collect_symbols`. Rerender only')
     self:render_in_viewport(true)
+  end
+end
+
+---Collect textDocument symbols
+function W:collect_symbols()
+  local function handler(_, response, ctx)
+    if not vim.api.nvim_buf_is_valid(self.bufnr) then
+      log.warn('`textDocument/documentSymbol` request was skipped. Reason: buffer is not valid')
+      return
+    end
+
+    if vim.tbl_isempty(response or {}) then
+      log.warn('`textDocument/documentSymbol` request was skipped. Reason: no response')
+      -- When the entire buffer content is deleted
+      self:delete_outdated_symbols()
+      return
+    end
+
+    if vim.fn.has('nvim-0.10') ~= 0 then
+      if ctx.version ~= vim.lsp.util.buf_versions[self.bufnr] then
+        log.warn('`textDocument/documentSymbol` request was skipped. Reason: buffer version is changed during request')
+        return
+      end
+    end
+
+    log.debug('Completed request `textDocument/documentSymbol`')
+    self:traversal(response)
+  end
+
+  log.debug('Start request `textDocument/documentSymbol`')
+  local params = { textDocument = vim.lsp.util.make_text_document_params() }
+  self.client.request('textDocument/documentSymbol', params, handler, self.bufnr)
+end
+
+---Delete outdated symbols and their marks
+function W:delete_outdated_symbols()
+  log.debug('Delete outdated symbols')
+  for id, rec in pairs(self.symbols) do
+    if rec.version ~= self.buf_version then
+      pcall(vim.api.nvim_buf_del_extmark, self.bufnr, ns, rec.mark_id)
+      self.symbols[id] = nil
+    end
+
+    if rec.is_stacked and rec.mark_id then
+      pcall(vim.api.nvim_buf_del_extmark, self.bufnr, ns, rec.mark_id)
+    end
   end
 end
 
@@ -83,54 +131,9 @@ function W:render_in_viewport(check_is_rendered)
 
     if need_render and pos and pos.line >= top and pos.line <= bot then
       for _, method in pairs(symbol.allowed_methods) do
+        log.debug('Count method', method, symbol_id)
         self:count_method(method, symbol_id, symbol.raw_symbol)
       end
-    end
-  end
-end
-
----Collect textDocument symbols
-function W:collect_symbols()
-  local function handler(_, response, ctx)
-    if not vim.api.nvim_buf_is_valid(self.bufnr) then
-      log.warn('`textDocument/documentSymbol` request was skipped. Reason: buffer is not valid')
-      return
-    end
-
-    if not response or vim.tbl_isempty(response) then
-      log.warn('`textDocument/documentSymbol` request was skipped. Reason: no response')
-      -- When the entire buffer content is deleted
-      self:delete_outdated_symbols()
-      return
-    end
-
-    if vim.fn.has('nvim-0.10') ~= 0 then
-      if ctx.version ~= vim.lsp.util.buf_versions[self.bufnr] then
-        log.warn('`textDocument/documentSymbol` request was skipped. Reason: buffer version is changed during request')
-        return
-      end
-    end
-
-    log.debug('Completed request `textDocument/documentSymbol`')
-
-    self:traversal(response)
-  end
-
-  log.debug('Start request `textDocument/documentSymbol`')
-  local params = { textDocument = vim.lsp.util.make_text_document_params() }
-  self.client.request('textDocument/documentSymbol', params, handler, self.bufnr)
-end
-
----Delete outdated symbols and their marks
-function W:delete_outdated_symbols()
-  for id, rec in pairs(self.symbols) do
-    if rec.version ~= self.buf_version then
-      pcall(vim.api.nvim_buf_del_extmark, self.bufnr, ns, rec.mark_id)
-      self.symbols[id] = nil
-    end
-
-    if rec.is_stacked and rec.mark_id then
-      pcall(vim.api.nvim_buf_del_extmark, self.bufnr, ns, rec.mark_id)
     end
   end
 end
@@ -250,8 +253,8 @@ function W:traversal(symbol_tree)
 
   _walk(symbol_tree, {})
 
-  self:delete_outdated_symbols()
   self:render_in_viewport(false)
+  self:delete_outdated_symbols()
 end
 
 ---Set or update extmark.
