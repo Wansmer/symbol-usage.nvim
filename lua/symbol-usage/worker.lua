@@ -199,15 +199,9 @@ function W:traversal(symbol_tree)
         goto continue
       end
 
-      local allowed_methods = (function()
-        local res = {}
-        for _, method in pairs({ 'references', 'definition', 'implementation' }) do
-          if self:is_need_count(symbol, method, parent) then
-            table.insert(res, method)
-          end
-        end
-        return res
-      end)()
+      local allowed_methods = vim.tbl_filter(function(method)
+        return self:is_need_count(symbol, method, parent)
+      end, { 'references', 'definition', 'implementation' })
 
       -- Do not store symbols that do not need to be counted for all methods
       if #allowed_methods == 0 then
@@ -290,22 +284,29 @@ end
 ---@param symbol_id string
 function W:count_method(method, symbol_id, symbol)
   if not u.support_method(self.client, method) then
+    log.warn('Unsupported method: "' .. method .. '" for "' .. self.client.name .. '"')
     return
   end
 
   local params = self:make_params(symbol, method)
   if not params then
+    log.warn('Failed to make params for method: "' .. method .. '" for "' .. self.client.name .. '"')
     return
   end
 
+  ---@param err lsp.ResponseError
+  ---@param response any
+  ---@param ctx lsp.HandlerContext
   local function handler(err, response, ctx)
     if err or not vim.api.nvim_buf_is_valid(self.bufnr) then
+      log.warn('Failed to count method: "' .. method .. '" for "' .. self.client.name .. '"')
       return
     end
 
     -- If document was changed, break collecting
     if vim.fn.has('nvim-0.10') ~= 0 then
       if ctx.version ~= vim.lsp.util.buf_versions[self.bufnr] then
+        log.info('Buffer version was changed during request')
         return
       end
     end
