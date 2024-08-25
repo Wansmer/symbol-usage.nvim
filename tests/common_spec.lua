@@ -94,4 +94,18 @@ describe('`symbol-usage`', function()
 
     assert.are.same(expected, result)
   end)
+
+  it('clear all extmarks if symbols were deleted', function()
+    -- remove all symbols
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, true, { '' })
+    local worker = require('symbol-usage.state').get_buf_workers(bufnr)[1]
+    worker:run(true)
+
+    vim.wait(300, function() end)
+
+    local NS = require('symbol-usage.utils').NS
+    local marks = vim.api.nvim_buf_get_extmarks(bufnr, NS, { 0, 0 }, { -1, -1 }, { details = true })
+
+    assert.are.same({}, marks)
+  end)
 end)
