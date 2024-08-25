@@ -63,28 +63,27 @@ function W:run(force)
   -- Run `collect_symbols` only if it is a force refresh or the buffer has been changed
   if is_changed or force then
     self.buf_version = vim.lsp.util.buf_versions[self.bufnr]
-
-    for _, symbol in pairs(self.symbols) do
-      symbol.is_stacked = nil
-      symbol.is_rendered = false
-      symbol.stacked_count = 0
-      symbol.stacked_symbols = {}
-    end
-
     log.debug('Run `collect_symbols`. Reason:', { force = force, changed = is_changed, buf_version = self.buf_version })
     self:collect_symbols()
   else
-    local win_info = vim.fn.getwininfo(vim.api.nvim_get_current_win())[1]
-    local top = win_info.topline
-    local bot = win_info.botline
+    self:render_in_viewport(true)
+  end
+end
 
-    for symbol_id, symbol in pairs(self.symbols) do
-      local pos = u.get_position(symbol.raw_symbol, self.opts)
-      if not symbol.is_stacked and not symbol.is_rendered and pos.line >= top and pos.line <= bot then
-        for _, method in pairs(symbol.allowed_methods) do
-          log.debug("Render symbol '" .. symbol_id .. "' on '" .. method .. "'" .. ' line: ' .. pos.line)
-          self:count_method(method, symbol_id, symbol.raw_symbol)
-        end
+---Count symbols in viewport and render it
+---@param check_is_rendered boolean Checks if symbol is already rendered and skips it if `true`. Otherwise, overwrite it with a new value
+function W:render_in_viewport(check_is_rendered)
+  local win_info = vim.fn.getwininfo(vim.api.nvim_get_current_win())[1]
+  local top = win_info.topline
+  local bot = win_info.botline
+
+  for symbol_id, symbol in pairs(self.symbols) do
+    local pos = u.get_position(symbol.raw_symbol, self.opts)
+    local need_render = not (check_is_rendered and symbol.is_rendered)
+
+    if need_render and pos and pos.line >= top and pos.line <= bot then
+      for _, method in pairs(symbol.allowed_methods) do
+        self:count_method(method, symbol_id, symbol.raw_symbol)
       end
     end
   end
@@ -101,7 +100,7 @@ function W:collect_symbols()
     if not response or vim.tbl_isempty(response) then
       log.warn('`textDocument/documentSymbol` request was skipped. Reason: no response')
       -- When the entire buffer content is deleted
-      self:delete_outdated_symbols({})
+      self:delete_outdated_symbols()
       return
     end
 
@@ -182,7 +181,7 @@ function W:traversal(symbol_tree)
   ---@param sorted_symbol_tree table Sorted response of `textDocument/documentSymbol`
   ---@param parent table sorted_symbol_tree item (symbol)
   ---@return table
-  local function _walk(sorted_symbol_tree, parent )
+  local function _walk(sorted_symbol_tree, parent)
     ---@type table<integer, string>
     local booked_lines = {}
 
@@ -240,6 +239,7 @@ function W:traversal(symbol_tree)
 
       if symbol_data.is_stacked then
         self.symbols[line_holder_id].stacked_symbols[symbol_id] = symbol_data
+        self.symbols[line_holder_id].stacked_count = self.symbols[line_holder_id].stacked_count + 1
       end
 
       self.symbols[symbol_id] = symbol_data
@@ -251,20 +251,7 @@ function W:traversal(symbol_tree)
   _walk(symbol_tree, {})
 
   self:delete_outdated_symbols()
-
-  for symbol_id, raw_symbol in pairs(self.symbols) do
-    self.symbols[symbol_id].stacked_count = #(vim.tbl_keys(self.symbols[symbol_id].stacked_symbols or {}))
-    local pos = u.get_position(raw_symbol, self.opts)
-    local win_info = vim.fn.getwininfo(vim.api.nvim_get_current_win())[1]
-    local top = win_info.topline
-    local bot = win_info.botline
-
-    if pos and pos.line >= top and pos.line <= bot then
-      for _, method in pairs(self.symbols[symbol_id].allowed_methods) do
-        self:count_method(method, symbol_id, raw_symbol)
-      end
-    end
-  end
+  self:render_in_viewport(false)
 end
 
 ---Set or update extmark.
@@ -348,7 +335,7 @@ function W:make_params(symbol, method)
     return
   end
 
-  local params = { position = position, textDocument = { uri = vim.uri_from_bufnr(0) } }
+  local params = { position = position, textDocument = { uri = vim.uri_from_bufnr(self.bufnr) } }
 
   if method == 'references' then
     params.context = { includeDeclaration = self.opts.references.include_declaration }
