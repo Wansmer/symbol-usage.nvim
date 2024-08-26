@@ -160,7 +160,10 @@ function M.make_extmark_opts(text, opts, line, bufnr, id)
     end,
     textwidth = function()
       local shift = not is_tbl and #text or get_vt_length(vtext --[[@as table]])
-      return { virt_text = vtext, virt_text_win_col = tonumber(vim.bo[bufnr].textwidth) - (shift + 1) }
+      return {
+        virt_text = vtext,
+        virt_text_win_col = tonumber(vim.api.nvim_get_option_value('textwidth', { buf = bufnr })) - (shift + 1),
+      }
     end,
     above = function()
       -- |vim.fn.indent()| is not convenient because it can't be specified for a specific buffer.
