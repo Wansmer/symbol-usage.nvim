@@ -55,7 +55,7 @@ function W:run(force)
     end)
 
   if no_run then
-    log.debug('Skip `run`. Reason: no_run = true')
+    log.debug('Skip `worker:run()`. Reason: no_run = true')
     return
   end
 
@@ -108,11 +108,13 @@ function W:delete_outdated_symbols()
   log.debug('Delete outdated symbols')
   for id, rec in pairs(self.symbols) do
     if rec.version ~= self.buf_version then
+      log.debug('Delete symbol and extmart for:', id, 'Reason: version was changed')
       pcall(vim.api.nvim_buf_del_extmark, self.bufnr, ns, rec.mark_id)
       self.symbols[id] = nil
     end
 
     if rec.is_stacked and rec.mark_id then
+      log.debug('Delete extmart for:', id, 'Reason: is_stacked = true')
       pcall(vim.api.nvim_buf_del_extmark, self.bufnr, ns, rec.mark_id)
     end
   end
@@ -131,7 +133,6 @@ function W:render_in_viewport(check_is_rendered)
 
     if need_render and pos and pos.line >= top and pos.line <= bot then
       for _, method in pairs(symbol.allowed_methods) do
-        log.debug('Count method', method, symbol_id)
         self:count_method(method, symbol_id, symbol.raw_symbol)
       end
     end
@@ -283,6 +284,7 @@ end
 ---@param method Method
 ---@param symbol_id string
 function W:count_method(method, symbol_id, symbol)
+  log.debug('Count method: "' .. method .. '" for "' .. symbol_id .. '"')
   if not u.support_method(self.client, method) then
     log.warn('Unsupported method: "' .. method .. '" for "' .. self.client.name .. '"')
     return
@@ -298,15 +300,20 @@ function W:count_method(method, symbol_id, symbol)
   ---@param response any
   ---@param ctx lsp.HandlerContext
   local function handler(err, response, ctx)
-    if err or not vim.api.nvim_buf_is_valid(self.bufnr) then
-      log.warn('Failed to count method: "' .. method .. '" for "' .. self.client.name .. '"')
+    local dbg_msg = ('Failed to count method: "%s", symbol_id: "%s"'):format(method, symbol_id)
+    if err then
+      log.error(dbg_msg, 'Reason:', { err = err })
+    end
+
+    if not vim.api.nvim_buf_is_valid(self.bufnr) then
+      log.warn(dbg_msg, 'Reason: buffer is not valid')
       return
     end
 
     -- If document was changed, break collecting
     if vim.fn.has('nvim-0.10') ~= 0 then
       if ctx.version ~= vim.lsp.util.buf_versions[self.bufnr] then
-        log.info('Buffer version was changed during request')
+        log.info(dbg_msg, 'Reason: document was changed')
         return
       end
     end
@@ -316,6 +323,7 @@ function W:count_method(method, symbol_id, symbol)
     local record = self.symbols[symbol_id]
 
     if not record then
+      log.warn(dbg_msg, 'Reason: symbol is not found')
       return
     end
 
@@ -326,6 +334,7 @@ function W:count_method(method, symbol_id, symbol)
     end
   end
 
+  log.debug('Start request', '"textDocument/' .. method .. '"', 'for symbol', symbol_id)
   self.client.request('textDocument/' .. method, params, handler, self.bufnr)
 end
 
