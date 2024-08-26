@@ -100,6 +100,32 @@ function M.get_position(symbol, opts)
   return position and position[place]
 end
 
+---@class MethodParams
+---@field position { line: integer, character: integer }
+---@field textDocument { uri: string }
+---@field context? { includeDeclaration: boolean }
+
+---Make params for lsp method request
+---@param symbol table Item from 'textDocument/documentSymbol' response
+---@param method Method Method name without 'textDocument/', e.g. 'references'|'definition'|'implementation'
+---@param opts UserOpts
+---@param bufnr number
+---@return MethodParams? returns nil if symbol have not 'selectionRange' or 'range' field
+function M.make_params(symbol, method, opts, bufnr)
+  local position = M.get_position(symbol, opts)
+  if not position then
+    return
+  end
+
+  local params = { position = position, textDocument = { uri = vim.uri_from_bufnr(bufnr) } }
+
+  if method == 'references' then
+    params.context = { includeDeclaration = opts.references.include_declaration }
+  end
+
+  return params
+end
+
 ---Return length of all virtual text
 ---@param vt table
 ---@return integer

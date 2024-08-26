@@ -288,7 +288,7 @@ function W:count_method(method, symbol_id, symbol)
     return
   end
 
-  local params = self:make_params(symbol, method)
+  local params = u.make_params(symbol, method, self.opts, self.bufnr)
   if not params then
     log.warn('Failed to make params for method: "' .. method .. '" for "' .. self.client.name .. '"')
     return
@@ -327,25 +327,6 @@ function W:count_method(method, symbol_id, symbol)
   end
 
   self.client.request('textDocument/' .. method, params, handler, self.bufnr)
-end
-
----Make params for lsp method request
----@param symbol table
----@param method Method Method name without 'textDocument/', e.g. 'references'|'definition'|'implementation'
----@return table? returns nil if symbol have not 'selectionRange' or 'range' field
-function W:make_params(symbol, method)
-  local position = u.get_position(symbol, self.opts)
-  if not position then
-    return
-  end
-
-  local params = { position = position, textDocument = { uri = vim.uri_from_bufnr(self.bufnr) } }
-
-  if method == 'references' then
-    params.context = { includeDeclaration = self.opts.references.include_declaration }
-  end
-
-  return params
 end
 
 return W
