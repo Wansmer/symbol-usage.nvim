@@ -55,7 +55,6 @@ function W:run(force)
     end)
 
   if no_run then
-    log.debug('Skip `worker:run()`. Reason: no_run = true')
     return
   end
 
@@ -64,10 +63,8 @@ function W:run(force)
   -- Run `collect_symbols` only if it is a force refresh or the buffer has been changed
   if is_changed or force then
     self.buf_version = vim.lsp.util.buf_versions[self.bufnr]
-    log.debug('Run `collect_symbols`. Reason:', { force = force, changed = is_changed, buf_version = self.buf_version })
     self:collect_symbols()
   else
-    log.debug('Skip `collect_symbols`. Rerender only')
     self:render_in_viewport(true)
   end
 end
@@ -76,12 +73,10 @@ end
 function W:collect_symbols()
   local function handler(_, response, ctx)
     if not vim.api.nvim_buf_is_valid(self.bufnr) then
-      log.warn('`textDocument/documentSymbol` request was skipped. Reason: buffer is not valid')
       return
     end
 
     if vim.tbl_isempty(response or {}) then
-      log.warn('`textDocument/documentSymbol` request was skipped. Reason: no response')
       -- When the entire buffer content is deleted
       self:delete_outdated_symbols()
       return
@@ -89,32 +84,26 @@ function W:collect_symbols()
 
     if vim.fn.has('nvim-0.10') ~= 0 then
       if ctx.version ~= vim.lsp.util.buf_versions[self.bufnr] then
-        log.warn('`textDocument/documentSymbol` request was skipped. Reason: buffer version is changed during request')
         return
       end
     end
 
-    log.debug('Completed request `textDocument/documentSymbol`')
     self:traversal(response)
   end
 
-  log.debug('Start request `textDocument/documentSymbol`')
   local params = { textDocument = vim.lsp.util.make_text_document_params() }
   self.client.request('textDocument/documentSymbol', params, handler, self.bufnr)
 end
 
 ---Delete outdated symbols and their marks
 function W:delete_outdated_symbols()
-  log.debug('Delete outdated symbols')
   for id, rec in pairs(self.symbols) do
     if rec.version ~= self.buf_version then
-      log.debug('Delete symbol and extmart for:', id, 'Reason: version was changed')
       pcall(vim.api.nvim_buf_del_extmark, self.bufnr, ns, rec.mark_id)
       self.symbols[id] = nil
     end
 
     if rec.is_stacked and rec.mark_id then
-      log.debug('Delete extmart for:', id, 'Reason: is_stacked = true')
       pcall(vim.api.nvim_buf_del_extmark, self.bufnr, ns, rec.mark_id)
     end
   end
@@ -284,15 +273,12 @@ end
 ---@param method Method
 ---@param symbol_id string
 function W:count_method(method, symbol_id, symbol)
-  log.debug('Count method: "' .. method .. '" for "' .. symbol_id .. '"')
   if not u.support_method(self.client, method) then
-    log.warn('Unsupported method: "' .. method .. '" for "' .. self.client.name .. '"')
     return
   end
 
   local params = u.make_params(symbol, method, self.opts, self.bufnr)
   if not params then
-    log.warn('Failed to make params for method: "' .. method .. '" for "' .. self.client.name .. '"')
     return
   end
 
@@ -302,18 +288,15 @@ function W:count_method(method, symbol_id, symbol)
   local function handler(err, response, ctx)
     local dbg_msg = ('Failed to count method: "%s", symbol_id: "%s"'):format(method, symbol_id)
     if err then
-      log.error(dbg_msg, 'Reason:', { err = err })
     end
 
     if not vim.api.nvim_buf_is_valid(self.bufnr) then
-      log.warn(dbg_msg, 'Reason: buffer is not valid')
       return
     end
 
     -- If document was changed, break collecting
     if vim.fn.has('nvim-0.10') ~= 0 then
       if ctx.version ~= vim.lsp.util.buf_versions[self.bufnr] then
-        log.info(dbg_msg, 'Reason: document was changed')
         return
       end
     end
@@ -323,7 +306,6 @@ function W:count_method(method, symbol_id, symbol)
     local record = self.symbols[symbol_id]
 
     if not record then
-      log.warn(dbg_msg, 'Reason: symbol is not found')
       return
     end
 
@@ -334,7 +316,6 @@ function W:count_method(method, symbol_id, symbol)
     end
   end
 
-  log.debug('Start request', '"textDocument/' .. method .. '"', 'for symbol', symbol_id)
   self.client.request('textDocument/' .. method, params, handler, self.bufnr)
 end
 
