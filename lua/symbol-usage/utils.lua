@@ -6,37 +6,12 @@ M.NESTED_GROUP = vim.api.nvim_create_augroup('__symbol_nested__', { clear = true
 
 M.is_list = vim.fn.has('nvim-0.10') == 1 and vim.islist or vim.tbl_islist
 
----Check if a table contains a value
----@param tbl table
----@param x any
----@return boolean
-function M.table_contains(tbl, x)
-  local found = false
-  for _, v in pairs(tbl) do
-    if v == x then
-      found = true
-    end
-  end
-  return found
-end
-
 ---Check if client supports method
 ---@param client vim.lsp.Client
 ---@param method string
 ---@return boolean
 function M.support_method(client, method)
   return client.supports_method('textDocument/' .. method)
-end
-
----Make params form 'textDocument/references' request
----@param ref table
----@return table
-function M.make_params(ref)
-  return {
-    context = { includeDeclaration = false },
-    position = ref.selectionRange['end'],
-    textDocument = { uri = vim.uri_from_bufnr(0) },
-  }
 end
 
 function M.some(tbl, cb)
