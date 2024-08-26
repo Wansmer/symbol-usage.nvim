@@ -15,7 +15,7 @@ function M.set_buf_autocmd(bufnr)
       nested = true,
       callback = u.debounce(function(e)
         for _, wkr in pairs(state.get_buf_workers(e.buf)) do
-          log.debug('Update worker on "' .. e.event .. '" for buffer', vim.api.nvim_buf_get_name(bufnr))
+          log.debug('Trigger worker on "%s" for buffer %s', e.event, bufnr)
           wkr:run(force)
         end
       end, 500),
@@ -33,7 +33,7 @@ function M.set_buf_autocmd(bufnr)
     o.callback = u.debounce(function(e)
       if e.data.method == 'textDocument/didOpen' then
         for _, wkr in pairs(state.get_buf_workers(e.buf)) do
-          log.debug('Run worker on "textDocument/didOpen" for buffer', vim.api.nvim_buf_get_name(bufnr))
+          log.debug('Trigger worker on "%s" for buffer %s', e.event .. ' (textDocument/didOpen)', bufnr)
           wkr:run(false)
         end
       end
@@ -71,7 +71,11 @@ function M.attach_buffer(bufnr)
     -- false if worker with this client for buffer already exists
     local need_run = state.add_worker(bufnr, w)
     if need_run then
-      log.debug('Run worker ' .. client.name .. ' for buffer', vim.api.nvim_buf_get_name(bufnr), 'Reason: attach_buffer')
+      log.debug(
+        'Run worker ' .. client.name .. ' for buffer',
+        vim.api.nvim_buf_get_name(bufnr),
+        'Reason: attach_buffer'
+      )
       w:run(true)
     end
   end

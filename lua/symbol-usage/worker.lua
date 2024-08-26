@@ -34,6 +34,7 @@ W.__index = W
 ---@param client vim.lsp.Client
 ---@return Worker
 function W.new(bufnr, client)
+  log.debug('Creating new worker for buffer: %d', bufnr)
   return setmetatable({
     bufnr = bufnr,
     client = client,
@@ -46,6 +47,8 @@ end
 ---Run worker for buffer
 ---@param force? boolean|nil
 function W:run(force)
+  log.trace('Running worker for buffer: %d', self.bufnr)
+
   local no_run = not state.active
     or not vim.api.nvim_buf_is_valid(self.bufnr)
     or vim.tbl_contains(self.opts.disable.lsp, self.client.name)
@@ -55,6 +58,7 @@ function W:run(force)
     end)
 
   if no_run then
+    log.info('Worker not running due to conditions not met for buffer: %d', self.bufnr)
     return
   end
 
@@ -62,48 +66,56 @@ function W:run(force)
 
   -- Run `collect_symbols` only if it is a force refresh or the buffer has been changed
   if is_changed or force then
+    log.debug('Buffer changed or forced refresh for buffer: %d', self.bufnr)
     self.buf_version = vim.lsp.util.buf_versions[self.bufnr]
-    self:collect_symbols()
+    self:request_symbols()
   else
+    log.trace('Rendering in viewport for buffer: %d', self.bufnr)
     self:render_in_viewport(true)
   end
 end
 
 ---Collect textDocument symbols
-function W:collect_symbols()
+function W:request_symbols()
   local function handler(_, response, ctx)
     if not vim.api.nvim_buf_is_valid(self.bufnr) then
+      log.warn('Buffer is no longer valid: %d', self.bufnr)
       return
     end
 
     if vim.tbl_isempty(response or {}) then
-      -- When the entire buffer content is deleted
+      log.info('No symbols found, deleting outdated symbols for buffer: %d', self.bufnr)
       self:delete_outdated_symbols()
       return
     end
 
     if vim.fn.has('nvim-0.10') ~= 0 then
       if ctx.version ~= vim.lsp.util.buf_versions[self.bufnr] then
+        log.warn('Buffer version mismatch for buffer: %d', self.bufnr)
         return
       end
     end
 
-    self:traversal(response)
+    self:collect_symbols(response)
   end
 
   local params = { textDocument = vim.lsp.util.make_text_document_params() }
+  log.trace('Requesting document symbols for buffer: %d', self.bufnr)
   self.client.request('textDocument/documentSymbol', params, handler, self.bufnr)
 end
 
 ---Delete outdated symbols and their marks
 function W:delete_outdated_symbols()
+  log.debug('Deleting outdated symbols for buffer: %d', self.bufnr)
   for id, rec in pairs(self.symbols) do
     if rec.version ~= self.buf_version then
+      log.info('Deleting outdated symbol and their extmark: %s', id)
       pcall(vim.api.nvim_buf_del_extmark, self.bufnr, ns, rec.mark_id)
       self.symbols[id] = nil
     end
 
     if rec.is_stacked and rec.mark_id then
+      log.info('Deleting stacked symbol extmark: %s', id)
       pcall(vim.api.nvim_buf_del_extmark, self.bufnr, ns, rec.mark_id)
     end
   end
@@ -112,6 +124,7 @@ end
 ---Count symbols in viewport and render it
 ---@param check_is_rendered boolean Checks if symbol is already rendered and skips it if `true`. Otherwise, overwrite it with a new value
 function W:render_in_viewport(check_is_rendered)
+  log.trace('Rendering symbols in viewport for buffer: %d', self.bufnr)
   local win_info = vim.fn.getwininfo(vim.api.nvim_get_current_win())[1]
   local top = win_info.topline
   local bot = win_info.botline
@@ -121,6 +134,7 @@ function W:render_in_viewport(check_is_rendered)
     local need_render = not (check_is_rendered and symbol.is_rendered)
 
     if need_render and pos and pos.line >= top and pos.line <= bot then
+      log.debug('Rendering symbol: %s in viewport', symbol_id)
       for _, method in pairs(symbol.allowed_methods) do
         self:count_method(method, symbol_id, symbol.raw_symbol)
       end
@@ -145,6 +159,7 @@ function W:is_need_count(symbol, method, parent)
   local matches_kind = vim.tbl_contains(kinds, kind)
   local filters = self.opts.kinds_filter[kind]
   local matches_filter = true
+
   if (matches_kind and filters) and not vim.tbl_isempty(filters) then
     matches_filter = u.every(filters, function(filter)
       return filter({ symbol = symbol, parent = parent, bufnr = self.bufnr })
@@ -156,7 +171,9 @@ end
 
 ---Traverse and collect document symbols
 ---@param symbol_tree table Response of `textDocument/documentSymbol`
-function W:traversal(symbol_tree)
+function W:collect_symbols(symbol_tree)
+  log.debug('Collecting and handling symbols for buffer: %d', self.bufnr)
+
   -- Sort by line and by position in line
   symbol_tree = u.sort(symbol_tree, function(a, b)
     local pos_a = u.get_position(a, self.opts)
@@ -184,7 +201,6 @@ function W:traversal(symbol_tree)
       end
 
       local pos = u.get_position(symbol, self.opts)
-      -- If not `pos`, the following actions are useless
       if not pos then
         goto continue
       end
@@ -199,7 +215,6 @@ function W:traversal(symbol_tree)
       end
 
       local symbol_id = table.concat({ parent.name or '', symbol.kind, symbol.name, symbol.detail or '' })
-
       local line_holder_id = booked_lines[pos.line]
       if not line_holder_id then
         booked_lines[pos.line] = symbol_id
@@ -209,7 +224,7 @@ function W:traversal(symbol_tree)
         is_stacked = line_holder_id ~= nil,
         stacked_count = 0,
         stacked_symbols = {},
-        is_rendered = false, -- TODO: should I restore it?
+        is_rendered = false,
         raw_symbol = symbol,
         version = self.buf_version,
         allowed_methods = allowed_methods,
@@ -218,7 +233,7 @@ function W:traversal(symbol_tree)
       -- Keep mark_id from previous symbol data if it exists
       symbol_data = vim.tbl_deep_extend('force', self.symbols[symbol_id] or {}, symbol_data)
 
-      -- TODO: should I set pending text here?
+      -- TODO: should I set pending text here or in `count_method`?
       -- Set pending text
       if not (symbol_data.mark_id or symbol_data.is_stacked) and self.opts.request_pending_text then
         symbol_data.mark_id = self:set_extmark(symbol_id, pos.line)
@@ -251,6 +266,7 @@ function W:set_extmark(symbol_id, line, count, id)
   -- The buffer can already be removed from the state when the woker finishes. See issue #32
   -- Prevent drawing already unneeded extmarks
   if next(state.get_buf_workers(self.bufnr)) == nil then
+    log.warn('No active workers for buffer: %d', self.bufnr)
     return
   end
 
@@ -261,11 +277,16 @@ function W:set_extmark(symbol_id, line, count, id)
   end
 
   if not text then
+    log.warn('No text to set extmark for symbol: %s', symbol_id)
     return
   end
 
   local opts = u.make_extmark_opts(text, self.opts, line, self.bufnr, id)
   local ok, new_id = pcall(vim.api.nvim_buf_set_extmark, self.bufnr, ns, line, 0, opts)
+  if not ok then
+    log.error('Failed to set extmark for symbol: %s. Reason: %s', symbol_id, new_id)
+  end
+
   return ok and new_id or nil
 end
 
@@ -274,11 +295,13 @@ end
 ---@param symbol_id string
 function W:count_method(method, symbol_id, symbol)
   if not u.support_method(self.client, method) then
+    log.warn('Method not supported: %s for symbol: %s', method, symbol_id)
     return
   end
 
   local params = u.make_params(symbol, method, self.opts, self.bufnr)
   if not params then
+    log.warn('Failed to create params for method: %s, symbol_id: %s', method, symbol_id)
     return
   end
 
@@ -286,17 +309,20 @@ function W:count_method(method, symbol_id, symbol)
   ---@param response any
   ---@param ctx lsp.HandlerContext
   local function handler(err, response, ctx)
-    local dbg_msg = ('Failed to count method: "%s", symbol_id: "%s"'):format(method, symbol_id)
     if err then
+      log.error('Failed to count method: "%s", symbol_id: "%s". Error: %s', method, symbol_id, err.message)
+      return
     end
 
     if not vim.api.nvim_buf_is_valid(self.bufnr) then
+      log.warn('Buffer is no longer valid: %d', self.bufnr)
       return
     end
 
     -- If document was changed, break collecting
     if vim.fn.has('nvim-0.10') ~= 0 then
       if ctx.version ~= vim.lsp.util.buf_versions[self.bufnr] then
+        log.warn('Buffer version mismatch for buffer: %d', self.bufnr)
         return
       end
     end
@@ -306,6 +332,7 @@ function W:count_method(method, symbol_id, symbol)
     local record = self.symbols[symbol_id]
 
     if not record then
+      log.warn('No record found for symbol_id: %s', symbol_id)
       return
     end
 
@@ -316,6 +343,7 @@ function W:count_method(method, symbol_id, symbol)
     end
   end
 
+  log.trace('Requesting count for method: %s, symbol_id: %s', method, symbol_id)
   self.client.request('textDocument/' .. method, params, handler, self.bufnr)
 end
 
