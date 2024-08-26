@@ -79,7 +79,7 @@ require('symbol-usage').setup({
   ---Alternatively, it can return a table of tuples of the form `{ { text, hl_group }, ... }`` - in this case the specified groups will be applied.
   ---If `vt_position` is 'signcolumn', then only a 1-2 length string or a `{{ icon, hl_group }}` table is expected.
   ---See `#format-text-examples`
-  ---@type function(symbol: Symbol): string|table Symbol{ definition = integer|nil, implementation = integer|nil, references = integer|nil }
+  ---@type function(symbol: Symbol): string|table Symbol{ definition = integer|nil, implementation = integer|nil, references = integer|nil, stacked_count = integer, stacked_symbols = table<SymbolId, Symbol> }
   -- text_format = function(symbol) end,
   references = { enabled = true, include_declaration = false },
   definition = { enabled = false },
@@ -91,6 +91,8 @@ require('symbol-usage').setup({
   -- filetypes = {},
   ---@type 'start'|'end' At which position of `symbol.selectionRange` the request to the lsp server should start. Default is `end` (try changing it to `start` if the symbol counting is not correct).
   symbol_request_pos = 'end', -- Recommended redefine only in `filetypes` override table
+  ---@type LoggerConfig
+  log = { enabled = false },
 })
 ```
 

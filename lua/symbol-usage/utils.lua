@@ -6,37 +6,12 @@ M.NESTED_GROUP = vim.api.nvim_create_augroup('__symbol_nested__', { clear = true
 
 M.is_list = vim.fn.has('nvim-0.10') == 1 and vim.islist or vim.tbl_islist
 
----Check if a table contains a value
----@param tbl table
----@param x any
----@return boolean
-function M.table_contains(tbl, x)
-  local found = false
-  for _, v in pairs(tbl) do
-    if v == x then
-      found = true
-    end
-  end
-  return found
-end
-
 ---Check if client supports method
 ---@param client vim.lsp.Client
 ---@param method string
 ---@return boolean
 function M.support_method(client, method)
   return client.supports_method('textDocument/' .. method)
-end
-
----Make params form 'textDocument/references' request
----@param ref table
----@return table
-function M.make_params(ref)
-  return {
-    context = { includeDeclaration = false },
-    position = ref.selectionRange['end'],
-    textDocument = { uri = vim.uri_from_bufnr(0) },
-  }
 end
 
 function M.some(tbl, cb)
@@ -65,6 +40,16 @@ function M.every(tbl, cb)
   end
 
   return true
+end
+
+---Get sorted copy of table
+---@param tbl table<integer, any>
+---@param predicat function(any, any): boolean
+---@return table
+function M.sort(tbl, predicat)
+  local res = vim.deepcopy(tbl)
+  table.sort(res, predicat)
+  return res
 end
 
 ---Recursively finding key in table and return its value if found or nil
@@ -98,7 +83,7 @@ end
 ---Explanation: Different clients return symbol data with different structures.
 ---@param symbol table Item from 'textDocument/documentSymbol' response
 ---@param opts? UserOpts Lang opts
----@return table?
+---@return { line: integer, character: integer }?
 function M.get_position(symbol, opts)
   opts = opts or {}
   -- First search 'selectionRange' because it gives range to name the symbol
@@ -113,6 +98,32 @@ function M.get_position(symbol, opts)
   end
 
   return position and position[place]
+end
+
+---@class MethodParams
+---@field position { line: integer, character: integer }
+---@field textDocument { uri: string }
+---@field context? { includeDeclaration: boolean }
+
+---Make params for lsp method request
+---@param symbol table Item from 'textDocument/documentSymbol' response
+---@param method Method Method name without 'textDocument/', e.g. 'references'|'definition'|'implementation'
+---@param opts UserOpts
+---@param bufnr number
+---@return MethodParams? returns nil if symbol have not 'selectionRange' or 'range' field
+function M.make_params(symbol, method, opts, bufnr)
+  local position = M.get_position(symbol, opts)
+  if not position then
+    return
+  end
+
+  local params = { position = position, textDocument = { uri = vim.uri_from_bufnr(bufnr) } }
+
+  if method == 'references' then
+    params.context = { includeDeclaration = opts.references.include_declaration }
+  end
+
+  return params
 end
 
 ---Return length of all virtual text
@@ -149,7 +160,10 @@ function M.make_extmark_opts(text, opts, line, bufnr, id)
     end,
     textwidth = function()
       local shift = not is_tbl and #text or get_vt_length(vtext --[[@as table]])
-      return { virt_text = vtext, virt_text_win_col = tonumber(vim.bo[bufnr].textwidth) - (shift + 1) }
+      return {
+        virt_text = vtext,
+        virt_text_win_col = tonumber(vim.api.nvim_get_option_value('textwidth', { buf = bufnr })) - (shift + 1),
+      }
     end,
     above = function()
       -- |vim.fn.indent()| is not convenient because it can't be specified for a specific buffer.
@@ -169,6 +183,22 @@ function M.make_extmark_opts(text, opts, line, bufnr, id)
     modes[opts.vt_position](),
     { id = id, hl_mode = 'combine', priority = opts.vt_priority }
   )
+end
+
+function M.debounce(cb, ms)
+  local timer ---@type uv_timer_t?
+  return function(...)
+    local args = { ... }
+    if timer then
+      timer:stop()
+      timer:close()
+    end
+
+    timer = vim.defer_fn(function()
+      timer = nil
+      cb(unpack(args))
+    end, ms)
+  end
 end
 
 return M

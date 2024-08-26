@@ -1,17 +1,24 @@
 local u = require('symbol-usage.utils')
 local o = require('symbol-usage.options')
 local state = require('symbol-usage.state')
+local log = require('symbol-usage.logger')
 
 local ns = u.NS
 
 ---@alias Method 'references'|'definition'|'implementation'
 
 ---@class Symbol
----@field mark_id integer Is of extmark
+---@field mark_id? integer Is of extmark
 ---@field references? integer Count of references
 ---@field definition? integer Count of definitions
 ---@field implementation? integer Count of implementations
 ---@field stacked_count? integer Count of symbols that are on the same line but not displayed
+---@field stacked_symbols? table<string, Symbol> Symbols that are on the same line but not displayed
+---@field is_stacked? boolean Is symbol on the same line but not displayed
+---@field is_rendered? boolean Is symbol rendered
+---@field allowed_methods table<integer, Method> Method to count
+---@field raw_symbol table Item from response of `textDocument/documentSymbol`
+---@field version? integer LSP version
 
 ---@class Worker
 ---@field bufnr number Buffer id
@@ -27,6 +34,7 @@ W.__index = W
 ---@param client vim.lsp.Client
 ---@return Worker
 function W.new(bufnr, client)
+  log.debug('Creating new worker for buffer: %d', bufnr)
   return setmetatable({
     bufnr = bufnr,
     client = client,
@@ -37,8 +45,10 @@ function W.new(bufnr, client)
 end
 
 ---Run worker for buffer
----@param check_version? boolean|nil
-function W:run(check_version)
+---@param force? boolean|nil
+function W:run(force)
+  log.trace('Running worker for buffer: %d', self.bufnr)
+
   local no_run = not state.active
     or not vim.api.nvim_buf_is_valid(self.bufnr)
     or vim.tbl_contains(self.opts.disable.lsp, self.client.name)
@@ -48,55 +58,86 @@ function W:run(check_version)
     end)
 
   if no_run then
+    log.info('Worker not running due to conditions not met for buffer: %d', self.bufnr)
     return
   end
 
-  if check_version then
-    -- Run only if buffer was changed
-    if self.buf_version ~= vim.lsp.util.buf_versions[self.bufnr] then
-      self.buf_version = vim.lsp.util.buf_versions[self.bufnr]
-      self:collect_symbols()
-    end
+  local is_changed = self.buf_version ~= vim.lsp.util.buf_versions[self.bufnr]
+
+  -- Run `collect_symbols` only if it is a force refresh or the buffer has been changed
+  if is_changed or force then
+    log.debug('Buffer changed or forced refresh for buffer: %d', self.bufnr)
+    self.buf_version = vim.lsp.util.buf_versions[self.bufnr]
+    self:request_symbols()
   else
-    -- Force refresh
-    self:collect_symbols()
+    log.trace('Rendering in viewport for buffer: %d', self.bufnr)
+    self:render_in_viewport(true)
   end
 end
 
 ---Collect textDocument symbols
-function W:collect_symbols()
+function W:request_symbols()
   local function handler(_, response, ctx)
     if not vim.api.nvim_buf_is_valid(self.bufnr) then
+      log.warn('Buffer is no longer valid: %d', self.bufnr)
       return
     end
 
-    if not response or vim.tbl_isempty(response) then
-      -- When the entire buffer content is deleted
-      self:clear_unused_symbols({})
+    if vim.tbl_isempty(response or {}) then
+      log.info('No symbols found, deleting outdated symbols for buffer: %d', self.bufnr)
+      self:delete_outdated_symbols()
       return
     end
 
     if vim.fn.has('nvim-0.10') ~= 0 then
       if ctx.version ~= vim.lsp.util.buf_versions[self.bufnr] then
+        log.warn('Buffer version mismatch for buffer: %d', self.bufnr)
         return
       end
     end
 
-    local actual = self:traversal(response)
-    self:clear_unused_symbols(actual)
+    self:collect_symbols(response)
   end
 
   local params = { textDocument = vim.lsp.util.make_text_document_params() }
+  log.trace('Requesting document symbols for buffer: %d', self.bufnr)
   self.client.request('textDocument/documentSymbol', params, handler, self.bufnr)
 end
 
----Clear symbols that no longer exist
----@param actual_symbols table<string, boolean>
-function W:clear_unused_symbols(actual_symbols)
+---Delete outdated symbols and their marks
+function W:delete_outdated_symbols()
+  log.debug('Deleting outdated symbols for buffer: %d', self.bufnr)
   for id, rec in pairs(self.symbols) do
-    if not actual_symbols[id] then
+    if rec.version ~= self.buf_version then
+      log.info('Deleting outdated symbol and their extmark: %s', id)
       pcall(vim.api.nvim_buf_del_extmark, self.bufnr, ns, rec.mark_id)
       self.symbols[id] = nil
+    end
+
+    if rec.is_stacked and rec.mark_id then
+      log.info('Deleting stacked symbol extmark: %s', id)
+      pcall(vim.api.nvim_buf_del_extmark, self.bufnr, ns, rec.mark_id)
+    end
+  end
+end
+
+---Count symbols in viewport and render it
+---@param check_is_rendered boolean Checks if symbol is already rendered and skips it if `true`. Otherwise, overwrite it with a new value
+function W:render_in_viewport(check_is_rendered)
+  log.trace('Rendering symbols in viewport for buffer: %d', self.bufnr)
+  local win_info = vim.fn.getwininfo(vim.api.nvim_get_current_win())[1]
+  local top = win_info.topline
+  local bot = win_info.botline
+
+  for symbol_id, symbol in pairs(self.symbols) do
+    local pos = u.get_position(symbol.raw_symbol, self.opts)
+    local need_render = not (check_is_rendered and symbol.is_rendered)
+
+    if need_render and pos and pos.line >= top and pos.line <= bot then
+      log.debug('Rendering symbol: %s in viewport', symbol_id)
+      for _, method in pairs(symbol.allowed_methods) do
+        self:count_method(method, symbol_id, symbol.raw_symbol)
+      end
     end
   end
 end
@@ -118,6 +159,7 @@ function W:is_need_count(symbol, method, parent)
   local matches_kind = vim.tbl_contains(kinds, kind)
   local filters = self.opts.kinds_filter[kind]
   local matches_filter = true
+
   if (matches_kind and filters) and not vim.tbl_isempty(filters) then
     matches_filter = u.every(filters, function(filter)
       return filter({ symbol = symbol, parent = parent, bufnr = self.bufnr })
@@ -127,138 +169,91 @@ function W:is_need_count(symbol, method, parent)
   return matches_kind and matches_filter
 end
 
----Add empty table to symbol_id in symbols
----@param symbol_id string
----@param pos table
-function W:mock_symbol(symbol_id, pos)
-  local mock = {}
-  if self.opts.request_pending_text then
-    -- Book a place for a virtual text
-    mock = {
-      mark_id = self:set_extmark(symbol_id, pos.line),
-      stacked_count = 0,
-    }
-  end
-  self.symbols[symbol_id] = mock
-end
-
 ---Traverse and collect document symbols
----@param symbol_tree table
----@return table
-function W:traversal(symbol_tree)
-  local booked_lines = {
-    references = {},
-    definition = {},
-    implementation = {},
-  }
+---@param symbol_tree table Response of `textDocument/documentSymbol`
+function W:collect_symbols(symbol_tree)
+  log.debug('Collecting and handling symbols for buffer: %d', self.bufnr)
 
-  local function _walk(data, parent, actual)
-    for _, symbol in ipairs(data) do
-      local pos = u.get_position(symbol, self.opts)
-      -- If not `pos`, the following actions are useless
-      if pos then
-        local symbol_id = table.concat({
-          parent and parent.name or '',
-          symbol.kind,
-          symbol.name,
-          symbol.detail and symbol.detail or '',
-        })
-
-        for _, method in pairs({ 'references', 'definition', 'implementation' }) do
-          if self:is_need_count(symbol, method, parent) then
-            if not u.table_contains(booked_lines[method] or {}, pos.line) then
-              table.insert(booked_lines[method], pos.line)
-
-              -- If symbol is new, add mock
-              if not self.symbols[symbol_id] or not actual[symbol_id] then
-                if not self.symbols[symbol_id] then
-                  self:mock_symbol(symbol_id, pos)
-                end
-
-                -- Collect actual symbols to remove irrelevant ones afterward
-                actual[symbol_id] = {
-                  methods = { [method] = 0 },
-                  symbol_id = symbol_id,
-                  symbol = symbol,
-                  render = true,
-                  line = pos.line,
-                  start_character = pos.character,
-                }
-              end
-
-              actual[symbol_id].methods[method] = 0
-            else
-              actual[symbol_id] = {
-                methods = { method = 0 },
-                method = method,
-                render = false,
-                line = pos.line,
-              }
-            end
-          end
-        end
-      end
-
-      if symbol.children and not vim.tbl_isempty(symbol.children) then
-        _walk(symbol.children, symbol, actual)
-      end
+  -- Sort by line and by position in line
+  symbol_tree = u.sort(symbol_tree, function(a, b)
+    local pos_a = u.get_position(a, self.opts)
+    local pos_b = u.get_position(b, self.opts)
+    if not (pos_a and pos_b) then
+      return false
     end
+    if pos_a.line == pos_b.line then
+      return pos_a.character < pos_b.character
+    else
+      return pos_a.line < pos_b.line
+    end
+  end)
 
-    return actual
+  ---@param sorted_symbol_tree table Sorted response of `textDocument/documentSymbol`
+  ---@param parent table sorted_symbol_tree item (symbol)
+  ---@return table
+  local function _walk(sorted_symbol_tree, parent)
+    ---@type table<integer, string>
+    local booked_lines = {}
+
+    for _, symbol in ipairs(sorted_symbol_tree) do
+      if symbol.children and not vim.tbl_isempty(symbol.children) then
+        _walk(symbol.children, symbol)
+      end
+
+      local pos = u.get_position(symbol, self.opts)
+      if not pos then
+        goto continue
+      end
+
+      local allowed_methods = vim.tbl_filter(function(method)
+        return self:is_need_count(symbol, method, parent)
+      end, { 'references', 'definition', 'implementation' })
+
+      -- Do not store symbols that do not need to be counted for all methods
+      if #allowed_methods == 0 then
+        goto continue
+      end
+
+      local symbol_id = table.concat({ parent.name or '', symbol.kind, symbol.name, symbol.detail or '' })
+      local line_holder_id = booked_lines[pos.line]
+      if not line_holder_id then
+        booked_lines[pos.line] = symbol_id
+      end
+
+      local symbol_data = {
+        is_stacked = line_holder_id ~= nil,
+        stacked_count = 0,
+        stacked_symbols = {},
+        is_rendered = false,
+        raw_symbol = symbol,
+        version = self.buf_version,
+        allowed_methods = allowed_methods,
+      }
+
+      -- Keep mark_id from previous symbol data if it exists
+      symbol_data = vim.tbl_deep_extend('force', self.symbols[symbol_id] or {}, symbol_data)
+
+      -- TODO: should I set pending text here or in `count_method`?
+      -- Set pending text
+      if not (symbol_data.mark_id or symbol_data.is_stacked) and self.opts.request_pending_text then
+        symbol_data.mark_id = self:set_extmark(symbol_id, pos.line)
+      end
+
+      if symbol_data.is_stacked then
+        self.symbols[line_holder_id].stacked_symbols[symbol_id] = symbol_data
+        self.symbols[line_holder_id].stacked_count = self.symbols[line_holder_id].stacked_count + 1
+      end
+
+      self.symbols[symbol_id] = symbol_data
+
+      ::continue::
+    end
   end
 
-  return (function()
-    local function sort_by_start_character(a, b)
-      local pos_a = u.get_position(a, self.opts)
-      local pos_b = u.get_position(b, self.opts)
-      if not (pos_a and pos_b) then
-        return false
-      end
-      return pos_a.character < pos_b.character
-    end
+  _walk(symbol_tree, {})
 
-    local sorted_data = {}
-    for _, item in ipairs(symbol_tree) do
-      table.insert(sorted_data, item)
-    end
-    table.sort(sorted_data, sort_by_start_character)
-
-    local walk_result = _walk(sorted_data, '', {})
-    for _, element in pairs(self.symbols) do
-      element.stacked_count = 0
-    end
-
-    local result = {}
-    for symbol_id, symbol in pairs(walk_result) do
-      if symbol.render then
-        for _, otherSymbol in pairs(walk_result) do
-          if not otherSymbol.render and otherSymbol.line == symbol.line then
-            symbol.methods[otherSymbol.method] = symbol.methods[otherSymbol.method] + 1
-
-            self.symbols[symbol_id].stacked_count = self.symbols[symbol_id].stacked_count + 1
-          end
-        end
-        result[symbol_id] = symbol
-      else
-        result[symbol_id] = symbol
-      end
-    end
-
-    -- Deleting elements with `value.render == false`
-    for key, value in pairs(result) do
-      if not value.render then
-        result[key] = nil
-      end
-    end
-
-    for _, value in pairs(result) do
-      for method_name, _ in pairs(value.methods) do
-        self:count_method(method_name, value.symbol_id, value.symbol)
-      end
-    end
-
-    return result
-  end)()
+  self:render_in_viewport(false)
+  self:delete_outdated_symbols()
 end
 
 ---Set or update extmark.
@@ -271,6 +266,7 @@ function W:set_extmark(symbol_id, line, count, id)
   -- The buffer can already be removed from the state when the woker finishes. See issue #32
   -- Prevent drawing already unneeded extmarks
   if next(state.get_buf_workers(self.bufnr)) == nil then
+    log.warn('No active workers for buffer: %d', self.bufnr)
     return
   end
 
@@ -281,11 +277,16 @@ function W:set_extmark(symbol_id, line, count, id)
   end
 
   if not text then
+    log.warn('No text to set extmark for symbol: %s', symbol_id)
     return
   end
 
   local opts = u.make_extmark_opts(text, self.opts, line, self.bufnr, id)
   local ok, new_id = pcall(vim.api.nvim_buf_set_extmark, self.bufnr, ns, line, 0, opts)
+  if not ok then
+    log.error('Failed to set extmark for symbol: %s. Reason: %s', symbol_id, new_id)
+  end
+
   return ok and new_id or nil
 end
 
@@ -294,22 +295,34 @@ end
 ---@param symbol_id string
 function W:count_method(method, symbol_id, symbol)
   if not u.support_method(self.client, method) then
+    log.warn('Method not supported: %s for symbol: %s', method, symbol_id)
     return
   end
 
-  local params = self:make_params(symbol, method)
+  local params = u.make_params(symbol, method, self.opts, self.bufnr)
   if not params then
+    log.warn('Failed to create params for method: %s, symbol_id: %s', method, symbol_id)
     return
   end
 
+  ---@param err lsp.ResponseError
+  ---@param response any
+  ---@param ctx lsp.HandlerContext
   local function handler(err, response, ctx)
-    if err or not vim.api.nvim_buf_is_valid(self.bufnr) then
+    if err then
+      log.error('Failed to count method: "%s", symbol_id: "%s". Error: %s', method, symbol_id, err.message)
+      return
+    end
+
+    if not vim.api.nvim_buf_is_valid(self.bufnr) then
+      log.warn('Buffer is no longer valid: %d', self.bufnr)
       return
     end
 
     -- If document was changed, break collecting
     if vim.fn.has('nvim-0.10') ~= 0 then
       if ctx.version ~= vim.lsp.util.buf_versions[self.bufnr] then
+        log.warn('Buffer version mismatch for buffer: %d', self.bufnr)
         return
       end
     end
@@ -317,39 +330,21 @@ function W:count_method(method, symbol_id, symbol)
     -- Some clients return `nil` if there are no references (e.g., `lua_ls`)
     local count = response and #response or 0
     local record = self.symbols[symbol_id]
-    local id
 
-    if record and record.mark_id then
-      id = record.mark_id
+    if not record then
+      log.warn('No record found for symbol_id: %s', symbol_id)
+      return
     end
 
-    id = self:set_extmark(symbol_id, params.position.line, { [method] = count }, id)
-    if record and id then
-      record.mark_id = id
-      record[method] = count
+    record[method] = count
+    if not record.is_stacked then
+      record.mark_id = self:set_extmark(symbol_id, params.position.line, { [method] = count }, record.mark_id)
+      record.is_rendered = true
     end
   end
 
+  log.trace('Requesting count for method: %s, symbol_id: %s', method, symbol_id)
   self.client.request('textDocument/' .. method, params, handler, self.bufnr)
-end
-
----Make params for lsp method request
----@param symbol table
----@param method Method Method name without 'textDocument/', e.g. 'references'|'definition'|'implementation'
----@return table? returns nil if symbol have not 'selectionRange' or 'range' field
-function W:make_params(symbol, method)
-  local position = u.get_position(symbol, self.opts)
-  if not position then
-    return
-  end
-
-  local params = { position = position, textDocument = { uri = vim.uri_from_bufnr(0) } }
-
-  if method == 'references' then
-    params.context = { includeDeclaration = self.opts.references.include_declaration }
-  end
-
-  return params
 end
 
 return W
