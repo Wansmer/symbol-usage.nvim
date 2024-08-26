@@ -47,13 +47,27 @@ function Logger.new(config)
   return logger
 end
 
-local function to_string(...)
-  local res = {}
-  for _, val in pairs({ ... }) do
-    if not (type(val) == 'string' or type(val) == 'number') then
-      val = vim.inspect(val)
+function Logger._stringify(...)
+  local args = { ... }
+  local message_to_format = ''
+  local function to_string(val)
+    return vim.list_contains({ 'string', 'number', 'boolean' }, type(val)) and tostring(val)
+      or vim.inspect(val, { indent = '', newline = ' ' })
+  end
+
+  if type(args[1]) == 'string' then
+    message_to_format = table.remove(args, 1)
+    local idx = message_to_format:find('%%%w')
+    while idx do
+      local arg = to_string(table.remove(args, 1))
+      message_to_format = message_to_format:sub(1, idx - 1) .. arg .. message_to_format:sub(idx + 2)
+      idx = message_to_format:find('%%%w', idx + 1)
     end
-    table.insert(res, val)
+  end
+
+  local res = { message_to_format }
+  for _, val in ipairs(args) do
+    table.insert(res, to_string(val))
   end
   return table.concat(res, ' ')
 end
@@ -67,7 +81,7 @@ function Logger:log(level, ...)
   end
 
   local timestamp = os.date('%Y-%m-%d %H:%M:%S')
-  local msg = string.format('%s [%s] %s', timestamp, level, to_string(...))
+  local msg = string.format('%s [%s] %s', timestamp, level, Logger._stringify(...))
 
   if self.config.log_file and self.config.log_file.path ~= '' then
     vim.fn.writefile({ msg }, self.config.log_file.path, 'a')
