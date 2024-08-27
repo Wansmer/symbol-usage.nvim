@@ -126,8 +126,8 @@ end
 function W:render_in_viewport(check_is_rendered)
   log.trace('Rendering symbols in viewport for buffer: %d', self.bufnr)
   local win_info = vim.fn.getwininfo(vim.api.nvim_get_current_win())[1]
-  local top = win_info.topline
-  local bot = win_info.botline
+  local top = win_info.topline - 1
+  local bot = win_info.botline - 1
 
   for symbol_id, symbol in pairs(self.symbols) do
     local pos = u.get_position(symbol.raw_symbol, self.opts)
