@@ -190,14 +190,12 @@ function W:collect_symbols(symbol_tree)
 
   ---@param sorted_symbol_tree table Sorted response of `textDocument/documentSymbol`
   ---@param parent table sorted_symbol_tree item (symbol)
+  ---@param booked_lines table<integer, string>
   ---@return table
-  local function _walk(sorted_symbol_tree, parent)
-    ---@type table<integer, string>
-    local booked_lines = {}
-
+  local function _walk(sorted_symbol_tree, parent, booked_lines)
     for _, symbol in ipairs(sorted_symbol_tree) do
       if symbol.children and not vim.tbl_isempty(symbol.children) then
-        _walk(symbol.children, symbol)
+        _walk(symbol.children, symbol, booked_lines)
       end
 
       local pos = u.get_position(symbol, self.opts)
@@ -250,7 +248,7 @@ function W:collect_symbols(symbol_tree)
     end
   end
 
-  _walk(symbol_tree, {})
+  _walk(symbol_tree, {}, {})
 
   self:render_in_viewport(false)
   self:delete_outdated_symbols()
