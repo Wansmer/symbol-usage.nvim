@@ -174,25 +174,24 @@ end
 function W:collect_symbols(symbol_tree)
   log.debug('Collecting and handling symbols for buffer: %d', self.bufnr)
 
-  -- Sort by line and by position in line
-  symbol_tree = u.sort(symbol_tree, function(a, b)
-    local pos_a = u.get_position(a, self.opts)
-    local pos_b = u.get_position(b, self.opts)
-    if not (pos_a and pos_b) then
-      return false
-    end
-    if pos_a.line == pos_b.line then
-      return pos_a.character < pos_b.character
-    else
-      return pos_a.line < pos_b.line
-    end
-  end)
-
-  ---@param sorted_symbol_tree table Sorted response of `textDocument/documentSymbol`
+  ---@param symbols table Sorted response of `textDocument/documentSymbol`
   ---@param parent table sorted_symbol_tree item (symbol)
   ---@param booked_lines table<integer, string>
   ---@return table
-  local function _walk(sorted_symbol_tree, parent, booked_lines)
+  local function _walk(symbols, parent, booked_lines)
+    local sorted_symbol_tree = u.sort(symbols, function(a, b)
+      local pos_a = u.get_position(a, self.opts)
+      local pos_b = u.get_position(b, self.opts)
+      if not (pos_a and pos_b) then
+        return false
+      end
+      if pos_a.line == pos_b.line then
+        return pos_a.character < pos_b.character
+      else
+        return pos_a.line < pos_b.line
+      end
+    end)
+
     for _, symbol in ipairs(sorted_symbol_tree) do
       local pos = u.get_position(symbol, self.opts)
       local allowed_methods = vim.tbl_filter(function(method)
