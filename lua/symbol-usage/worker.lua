@@ -174,83 +174,72 @@ end
 function W:collect_symbols(symbol_tree)
   log.debug('Collecting and handling symbols for buffer: %d', self.bufnr)
 
-  -- Sort by line and by position in line
-  symbol_tree = u.sort(symbol_tree, function(a, b)
-    local pos_a = u.get_position(a, self.opts)
-    local pos_b = u.get_position(b, self.opts)
-    if not (pos_a and pos_b) then
-      return false
-    end
-    if pos_a.line == pos_b.line then
-      return pos_a.character < pos_b.character
-    else
-      return pos_a.line < pos_b.line
-    end
-  end)
-
-  ---@param sorted_symbol_tree table Sorted response of `textDocument/documentSymbol`
+  ---@param symbols table Sorted response of `textDocument/documentSymbol`
   ---@param parent table sorted_symbol_tree item (symbol)
+  ---@param booked_lines table<integer, string>
   ---@return table
-  local function _walk(sorted_symbol_tree, parent)
-    ---@type table<integer, string>
-    local booked_lines = {}
+  local function _walk(symbols, parent, booked_lines)
+    local sorted_symbol_tree = u.sort(symbols, function(a, b)
+      local pos_a = u.get_position(a, self.opts)
+      local pos_b = u.get_position(b, self.opts)
+      if not (pos_a and pos_b) then
+        return false
+      end
+      if pos_a.line == pos_b.line then
+        return pos_a.character < pos_b.character
+      else
+        return pos_a.line < pos_b.line
+      end
+    end)
 
     for _, symbol in ipairs(sorted_symbol_tree) do
-      if symbol.children and not vim.tbl_isempty(symbol.children) then
-        _walk(symbol.children, symbol)
-      end
-
       local pos = u.get_position(symbol, self.opts)
-      if not pos then
-        goto continue
-      end
-
       local allowed_methods = vim.tbl_filter(function(method)
         return self:is_need_count(symbol, method, parent)
       end, { 'references', 'definition', 'implementation' })
 
-      -- Do not store symbols that do not need to be counted for all methods
-      if #allowed_methods == 0 then
-        goto continue
+      if pos and #allowed_methods > 0 then
+        local symbol_id = table.concat({ parent.name or '', symbol.kind, symbol.name, symbol.detail or '' })
+        local line_holder_id = booked_lines[pos.line]
+        if not line_holder_id then
+          booked_lines[pos.line] = symbol_id
+        end
+
+        local symbol_data = {
+          is_stacked = line_holder_id ~= nil,
+          stacked_count = 0,
+          stacked_symbols = {},
+          is_rendered = false,
+          raw_symbol = symbol,
+          version = self.buf_version,
+          allowed_methods = allowed_methods,
+        }
+
+        -- Keep mark_id from previous symbol data if it exists
+        symbol_data = vim.tbl_deep_extend('force', self.symbols[symbol_id] or {}, symbol_data)
+
+        -- TODO: should I set pending text here or in `count_method`?
+        -- Set pending text
+        if not (symbol_data.mark_id or symbol_data.is_stacked) and self.opts.request_pending_text then
+          symbol_data.mark_id = self:set_extmark(symbol_id, pos.line)
+        end
+
+        if symbol_data.is_stacked then
+          self.symbols[line_holder_id].stacked_symbols[symbol_id] = symbol_data
+          self.symbols[line_holder_id].stacked_count = self.symbols[line_holder_id].stacked_count + 1
+        end
+
+        self.symbols[symbol_id] = symbol_data
       end
 
-      local symbol_id = table.concat({ parent.name or '', symbol.kind, symbol.name, symbol.detail or '' })
-      local line_holder_id = booked_lines[pos.line]
-      if not line_holder_id then
-        booked_lines[pos.line] = symbol_id
+      -- Traverse children only after parent is processed
+      if symbol.children and not vim.tbl_isempty(symbol.children) then
+        _walk(symbol.children, symbol, booked_lines)
       end
-
-      local symbol_data = {
-        is_stacked = line_holder_id ~= nil,
-        stacked_count = 0,
-        stacked_symbols = {},
-        is_rendered = false,
-        raw_symbol = symbol,
-        version = self.buf_version,
-        allowed_methods = allowed_methods,
-      }
-
-      -- Keep mark_id from previous symbol data if it exists
-      symbol_data = vim.tbl_deep_extend('force', self.symbols[symbol_id] or {}, symbol_data)
-
-      -- TODO: should I set pending text here or in `count_method`?
-      -- Set pending text
-      if not (symbol_data.mark_id or symbol_data.is_stacked) and self.opts.request_pending_text then
-        symbol_data.mark_id = self:set_extmark(symbol_id, pos.line)
-      end
-
-      if symbol_data.is_stacked then
-        self.symbols[line_holder_id].stacked_symbols[symbol_id] = symbol_data
-        self.symbols[line_holder_id].stacked_count = self.symbols[line_holder_id].stacked_count + 1
-      end
-
-      self.symbols[symbol_id] = symbol_data
-
-      ::continue::
     end
   end
 
-  _walk(symbol_tree, {})
+  _walk(symbol_tree, {}, {})
 
   self:render_in_viewport(false)
   self:delete_outdated_symbols()
