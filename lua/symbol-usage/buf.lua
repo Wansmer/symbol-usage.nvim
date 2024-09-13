@@ -8,22 +8,29 @@ local M = {}
 ---Set nested autocmd for buffer
 ---@param bufnr integer Buffer id
 function M.set_buf_autocmd(bufnr)
+  local cb = function(force)
+    return function(e)
+      for _, wkr in pairs(state.get_buf_workers(e.buf)) do
+        log.debug('Trigger worker on "%s" for buffer %s', e.event, bufnr)
+        wkr:run(force)
+      end
+    end
+  end
+
   local opts = function(force)
     return {
       buffer = bufnr,
       group = u.NESTED_GROUP,
       nested = true,
-      callback = u.debounce(function(e)
-        for _, wkr in pairs(state.get_buf_workers(e.buf)) do
-          log.debug('Trigger worker on "%s" for buffer %s', e.event, bufnr)
-          wkr:run(force)
-        end
-      end, 500),
+      callback = cb(force),
     }
   end
 
   vim.api.nvim_create_autocmd({ 'TextChanged', 'InsertLeave' }, opts(false))
-  vim.api.nvim_create_autocmd('WinScrolled', opts(false))
+
+  local deb_opts = opts(false)
+  deb_opts.callback = u.debounce(deb_opts.callback, 500)
+  vim.api.nvim_create_autocmd('WinScrolled', deb_opts)
 
   -- Force refresh on BufEnter because the symbol usage data may have changed in other buffers
   vim.api.nvim_create_autocmd('BufEnter', opts(true))
