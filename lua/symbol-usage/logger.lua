@@ -10,7 +10,7 @@ local levels = vim.deepcopy(vim.log.levels)
 ---@field stdout { enabled: boolean, hl: table<LogLevel, string> }
 ---@field log_file { enabled: boolean, path: string }
 ---@field notify { enabled: boolean }
-local defaut_config = {
+local default_config = {
   enabled = false,
   level = 'INFO',
   log_file = {
@@ -35,7 +35,7 @@ Logger.__index = Logger
 ---@return Logger
 function Logger.new(config)
   local logger = setmetatable({
-    config = vim.tbl_deep_extend('force', defaut_config, config or {}),
+    config = vim.tbl_deep_extend('force', default_config, config or {}),
   }, Logger)
 
   for level, _ in pairs(levels) do
