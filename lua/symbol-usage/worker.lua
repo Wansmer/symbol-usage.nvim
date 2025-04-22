@@ -324,7 +324,7 @@ function W:count_method(method, symbol_id, symbol)
     end
 
     local symbol_filter = options.get_ft_or_default(ctx.bufnr).symbol_filter
-    if symbol_filter ~= nil then
+    if symbol_filter ~= nil and response ~= nil then
       response = vim.tbl_filter(symbol_filter(ctx), response)
     end
 
