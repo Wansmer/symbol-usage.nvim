@@ -91,6 +91,12 @@ require('symbol-usage').setup({
   -- filetypes = {},
   ---@type 'start'|'end' At which position of `symbol.selectionRange` the request to the lsp server should start. Default is `end` (try changing it to `start` if the symbol counting is not correct).
   symbol_request_pos = 'end', -- Recommended redefine only in `filetypes` override table
+  ---@type (fun(ctx: lsp.HandlerContext):fun(symbol: lsp.Location): boolean)?
+  -- This is a function factory that takes the LSP context as a parameter and
+  -- produce a filter function for vim.tbl_filter. This can be used to exclude
+  -- certain references/definition/implementation from being included in the
+  -- count. See [Filtering Symbols] for details.
+  symbol_filter = nil,
   ---@type LoggerConfig
   log = { enabled = false },
 })
@@ -337,6 +343,28 @@ I would like to know how many times an arrow function is used, but keeping track
 For this purpose, you can define additional filters that will check that the variable contains exactly the function and not some other value.
 
 You can see implementation examples [here](lua/symbol-usage/langs.lua).
+
+## Filtering Symbols
+
+Sometimes we want to exclude certain definition/references (eg. references from tests). 
+You can use the `symbol_filter` option to define a custom filter. For example,
+if you want to exclude the references for a symbol when the references are from
+a test file (which usually lies in the `tests/` directory), you can use the following
+filter:
+```lua
+symbol_filter = function(ctx)
+  return function(symbol)
+    if ctx.method == vim.lsp.protocol.Methods.textDocument_references then
+      -- if the LSP request is 'textDocument/references', do not count it if the URI contains `tests/`
+      return string.find(symbol.uri, "tests") == nil
+    else
+      -- for other types of LSP requests, do not apply a filter and always count
+      -- the occurrence.
+      return true
+    end
+  end
+end
+```
 
 ## API
 

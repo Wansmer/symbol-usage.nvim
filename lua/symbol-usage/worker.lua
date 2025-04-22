@@ -2,6 +2,7 @@ local u = require('symbol-usage.utils')
 local o = require('symbol-usage.options')
 local state = require('symbol-usage.state')
 local log = require('symbol-usage.logger')
+local options = require('symbol-usage.options')
 
 local ns = u.NS
 
@@ -320,6 +321,11 @@ function W:count_method(method, symbol_id, symbol)
         log.warn('Buffer version mismatch for buffer: %d', self.bufnr)
         return
       end
+    end
+
+    local symbol_filter = options.get_ft_or_default(ctx.bufnr).symbol_filter
+    if symbol_filter ~= nil and response ~= nil then
+      response = vim.tbl_filter(symbol_filter(ctx), response)
     end
 
     -- Some clients return `nil` if there are no references (e.g., `lua_ls`)

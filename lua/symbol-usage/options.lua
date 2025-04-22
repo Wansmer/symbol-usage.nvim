@@ -32,6 +32,7 @@ local SymbolKind = vim.lsp.protocol.SymbolKind
 ---@field disable? { lsp?: string[], filetypes?: string[], cond?: function[] } Disables `symbol-usage.nvim' for specific LSPs, filetypes, or on custom conditions. The function in the `cond` list takes an argument `bufnr` and returns a boolean. If it returns true, `symbol-usage` will not run in that buffer.
 ---@field filetypes UserOpts[] To override opts for specific filetypes. Missing field came from common opts
 ---@field log LoggerConfig
+---@field symbol_filter? fun(ctx: lsp.HandlerContext):(fun(symbol: lsp.Location): boolean)
 
 local S = {}
 
@@ -78,6 +79,7 @@ S._default_opts = {
     vue = langs.javascript,
   },
   log = { enabled = false },
+  symbol_filter = nil,
 }
 
 S.opts = {}
