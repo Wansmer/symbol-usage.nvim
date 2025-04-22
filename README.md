@@ -356,7 +356,7 @@ symbol_filter = function(ctx)
   return function(symbol)
     if ctx.method == vim.lsp.protocol.Methods.textDocument_references then
       -- if the LSP request is 'textDocument/references', do not count it if the URI contains `tests/`
-      return string.find(symbol.uri, "tests") ~= nil
+      return string.find(symbol.uri, "tests") == nil
     else
       -- for other types of LSP requests, do not apply a filter and always count
       -- the occurrence.
