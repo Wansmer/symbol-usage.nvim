@@ -178,7 +178,6 @@ function W:collect_symbols(symbol_tree)
   ---@param symbols table Sorted response of `textDocument/documentSymbol`
   ---@param parent table sorted_symbol_tree item (symbol)
   ---@param booked_lines table<integer, string>
-  ---@return table
   local function _walk(symbols, parent, booked_lines)
     local sorted_symbol_tree = u.sort(symbols, function(a, b)
       local pos_a = u.get_position(a, self.opts)
