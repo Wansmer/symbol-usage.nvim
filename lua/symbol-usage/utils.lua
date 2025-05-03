@@ -19,7 +19,7 @@ end
 ---@param method string
 ---@return boolean
 function M.support_method(client, method)
-  return client.supports_method('textDocument/' .. method)
+  return M.call_client_method(client, 'supports_method', 'textDocument/' .. method)
 end
 
 function M.some(tbl, cb)

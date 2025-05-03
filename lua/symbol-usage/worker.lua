@@ -6,12 +6,6 @@ local options = require('symbol-usage.options')
 
 local ns = u.NS
 
----@param client vim.lsp.Client
-local request = function(client, ...)
-  local is11 = vim.fn.has('nvim-0.11') == 1
-  return is11 and client.request(client, ...) or client.request(...)
-end
-
 ---@alias Method 'references'|'definition'|'implementation'
 
 ---@class Symbol
@@ -108,7 +102,7 @@ function W:request_symbols()
 
   local params = { textDocument = vim.lsp.util.make_text_document_params() }
   log.trace('Requesting document symbols for buffer: %d', self.bufnr)
-  request(self.client, 'textDocument/documentSymbol', params, handler, self.bufnr)
+  u.call_client_method(self.client, 'request', 'textDocument/documentSymbol', params, handler, self.bufnr)
 end
 
 ---Delete outdated symbols and their marks
@@ -345,7 +339,7 @@ function W:count_method(method, symbol_id, symbol)
   end
 
   log.trace('Requesting count for method: %s, symbol_id: %s', method, symbol_id)
-  request(self.client, 'textDocument/' .. method, params, handler, self.bufnr)
+  u.call_client_method(self.client, 'request', 'textDocument/' .. method, params, handler, self.bufnr)
 end
 
 return W
