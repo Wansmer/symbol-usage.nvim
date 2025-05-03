@@ -6,6 +6,14 @@ M.NESTED_GROUP = vim.api.nvim_create_augroup('__symbol_nested__', { clear = true
 
 M.is_list = vim.fn.has('nvim-0.10') == 1 and vim.islist or vim.tbl_islist
 
+---Why? See `:h deprecated-0.11`
+---@param client vim.lsp.Client
+---@param method 'request' | 'request_sync' | 'notify' | 'cancel_request' | 'stop' | 'is_stopped' | 'supports_method' | 'on_attach'
+function M.call_client_method(client, method, ...)
+  local is11 = vim.fn.has('nvim-0.11') == 1
+  return is11 and client[method](client, ...) or client[method](...)
+end
+
 ---Check if client supports method
 ---@param client vim.lsp.Client
 ---@param method string
