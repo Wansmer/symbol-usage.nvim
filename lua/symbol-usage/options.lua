@@ -33,6 +33,7 @@ local SymbolKind = vim.lsp.protocol.SymbolKind
 ---@field filetypes UserOpts[] To override opts for specific filetypes. Missing field came from common opts
 ---@field log LoggerConfig
 ---@field symbol_filter? fun(ctx: lsp.HandlerContext):(fun(symbol: lsp.Location): boolean)
+---@field overflow? 'scroll'|nil Hide virtual text when the associted line is scrolled out of the current window view
 
 local S = {}
 
@@ -80,6 +81,7 @@ S._default_opts = {
   },
   log = { enabled = false },
   symbol_filter = nil,
+  overflow = nil,
 }
 
 S.opts = {}
