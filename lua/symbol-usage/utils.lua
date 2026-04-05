@@ -11,7 +11,10 @@ M.is_list = vim.fn.has('nvim-0.10') == 1 and vim.islist or vim.tbl_islist
 ---@param method 'request' | 'request_sync' | 'notify' | 'cancel_request' | 'stop' | 'is_stopped' | 'supports_method' | 'on_attach'
 function M.call_client_method(client, method, ...)
   local is11 = vim.fn.has('nvim-0.11') == 1
-  return is11 and client[method](client, ...) or client[method](...)
+  if not is11 then
+    return client[method](...)
+  end
+  return client[method](client, ...)
 end
 
 ---Check if client supports method
