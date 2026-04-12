@@ -99,6 +99,7 @@ require('symbol-usage').setup({
   symbol_filter = nil,
   ---@type LoggerConfig
   log = { enabled = false },
+---@field overflow? 'scroll'|nil Hide virtual text when the associted line is scrolled out of the current window view
 })
 ```
 

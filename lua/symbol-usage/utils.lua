@@ -189,11 +189,12 @@ function M.make_extmark_opts(text, opts, line, bufnr, id)
     end,
   }
 
-  return vim.tbl_extend(
-    'force',
-    modes[opts.vt_position](),
-    { id = id, hl_mode = 'combine', priority = opts.vt_priority }
-  )
+  return vim.tbl_extend('force', modes[opts.vt_position](), {
+    id = id,
+    hl_mode = 'combine',
+    priority = opts.vt_priority,
+    virt_lines_overflow = vim.fn.has('nvim-0.11') and opts.overflow,
+  })
 end
 
 function M.debounce(cb, ms)
